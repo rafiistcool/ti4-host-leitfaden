@@ -334,6 +334,10 @@
 
   function viewCredits() {
     return '<a class="back" href="#nachschlagen">' + svg("back", 18) + "Nachschlagen</a><h1>Über diese Seite</h1>" +
+      '<div class="card credits"><h3>Als App aufs Handy</h3>' +
+      "<ul><li><b>iPhone, iPad:</b> Seite in Safari öffnen, Teilen-Symbol, „Zum Home-Bildschirm“.</li>" +
+      "<li><b>Android:</b> Seite in Chrome öffnen, Menü mit den drei Punkten, „App installieren“ oder „Zum Startbildschirm hinzufügen“.</li></ul>" +
+      "<p>Danach startet der Leitfaden wie eine App im Vollbild und funktioniert nach dem ersten Öffnen auch offline.</p></div>" +
       '<div class="card credits"><h3>Inoffizielles Fan-Hilfsmittel</h3>' +
       "<p>Ein Host-Leitfaden für Partien von Twilight Imperium: Vierte Edition mit der Erweiterung Prophezeiung der Könige. Er führt durch die Spielrunde und fasst die Regeln zum Nachschlagen zusammen.</p>" +
       "<p>Alle Texte sind eigene Zusammenfassungen, kein Abdruck des offiziellen Regelhefts. Bei Abweichungen gelten immer der Kartentext und die offizielle Living Rules Reference.</p></div>" +
@@ -345,7 +349,7 @@
       '<li>Zum Gegenlesen: <a href="https://www.tirules.com" target="_blank" rel="noopener">tirules.com</a> (englische Rules Reference mit Klarstellungen) und das <a href="https://twilight-imperium.fandom.com" target="_blank" rel="noopener">Twilight Imperium Wiki</a>.</li></ul></div>' +
       '<div class="card credits"><h3>Gemacht von</h3>' +
       '<p>Zusammengestellt von Rafael Till (<a href="https://github.com/rafiistcool" target="_blank" rel="noopener">@rafiistcool</a>) mit Unterstützung von Claude (Anthropic).</p>' +
-      "<p>Schriften: Saira Condensed, Source Sans 3 und IBM Plex Mono über Google Fonts (SIL Open Font License).</p>" +
+      "<p>Schriften: Saira Condensed, Source Sans 3 und IBM Plex Mono (SIL Open Font License). In der installierten App werden sie mitgeliefert, damit alles offline funktioniert.</p>" +
       "<p>Fortschritt, Runde und abgehakte Punkte werden nur lokal in diesem Browser gespeichert.</p></div>";
   }
 

@@ -233,7 +233,7 @@ mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
 @media (min-width:960px){
   .rail{display:flex;flex-direction:column;gap:18px;width:300px;flex:none;position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--chrome);color:var(--chrome-ink);padding:24px 14px}
   .tabbar{display:none}
-  .top{background:var(--bg);color:var(--ink);border-bottom:1px solid var(--line);padding:12px 32px}
+  .top{background:var(--bg);color:var(--ink);border-bottom:1px solid var(--line);padding:calc(12px + env(safe-area-inset-top,0px)) 32px 12px}
   .top .round-ctl{border-color:var(--line-2);background:var(--surface)}
   .top .round-ctl button{color:var(--ink)}
   .top .cust{border-color:var(--line-2);color:var(--muted);background:var(--surface)}

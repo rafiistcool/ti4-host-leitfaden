@@ -1,0 +1,7 @@
+.git
+.github
+site
+dist
+node_modules
+__pycache__
+*.md

@@ -1,42 +1,127 @@
 #!/usr/bin/env python3
-"""Baut aus src/ eine einzige, eigenständige index.html.
+"""Baut den TI4 Host-Leitfaden aus src/.
 
-  python3 build.py            -> index.html (vollständiges HTML-Dokument)
-  python3 build.py --fragment -> dist/artifact.html (ohne <html>/<head>/<body>-Gerüst)
+  python3 build.py              -> site/   installierbare Web-App (für GitHub Pages, Docker, jeden Webserver)
+  python3 build.py --artifact   -> dist/artifact.html   einzelne Datei ohne HTML-Gerüst, Schriften über Google Fonts
+
+Nur Python-Standardbibliothek, keine Abhängigkeiten.
 """
+import hashlib
+import json
 import pathlib
+import shutil
 import sys
 
-ROOT = pathlib.Path(__file__).parent
+ROOT = pathlib.Path(__file__).resolve().parent
 SRC = ROOT / "src"
 DATA = ["data/ablauf.js", "data/themen.js", "data/regeln-1.js", "data/regeln-2.js"]
 
+GOOGLE_FONTS = (
+    '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700'
+    '&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@500&display=swap">'
+)
 
-def fragment() -> str:
-    tpl = (SRC / "index.template.html").read_text(encoding="utf-8")
-    data = "\n".join((SRC / p).read_text(encoding="utf-8") for p in DATA)
-    return (tpl.replace("/*STYLE*/", (SRC / "style.css").read_text(encoding="utf-8"))
-               .replace("/*DATA*/", data)
-               .replace("/*APP*/", (SRC / "app.js").read_text(encoding="utf-8")))
+# (Familie, Stil, Gewicht, Datei)
+LOCAL_FONTS = [
+    ("Saira Condensed", "normal", 600, "saira-condensed-latin-600-normal.woff2"),
+    ("Saira Condensed", "normal", 700, "saira-condensed-latin-700-normal.woff2"),
+    ("Source Sans 3", "normal", 400, "source-sans-3-latin-400-normal.woff2"),
+    ("Source Sans 3", "italic", 400, "source-sans-3-latin-400-italic.woff2"),
+    ("Source Sans 3", "normal", 600, "source-sans-3-latin-600-normal.woff2"),
+    ("Source Sans 3", "normal", 700, "source-sans-3-latin-700-normal.woff2"),
+    ("IBM Plex Mono", "normal", 500, "ibm-plex-mono-latin-500-normal.woff2"),
+]
+
+ICONS = ["icon.svg", "icon-maskable.svg", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "favicon-32.png"]
+
+PWA_HEAD = """<meta name="theme-color" content="#172033">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TI4 Host">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+"""
+
+PWA_SCRIPT = """<script>
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+}
+</script>"""
 
 
-def document(body: str) -> str:
-    head, sep, rest = body.partition("<div class=\"app\"")
-    return ("<!doctype html>\n<html lang=\"de\">\n<head>\n<meta charset=\"utf-8\">\n"
-            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
-            "<meta name=\"theme-color\" content=\"#172033\">\n"
-            "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">\n"
-            "<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\">\n"
-            + head + "</head>\n<body>\n" + sep + rest + "</body>\n</html>\n")
+def read(rel: str) -> str:
+    return (SRC / rel).read_text(encoding="utf-8")
+
+
+def body(fonts_html: str, pwa_html: str) -> str:
+    data = "\n".join(read(p) for p in DATA)
+    return (read("index.template.html")
+            .replace("<!--FONTS-->", fonts_html)
+            .replace("/*STYLE*/", read("style.css"))
+            .replace("/*DATA*/", data)
+            .replace("/*APP*/", read("app.js"))
+            .replace("<!--PWA-->", pwa_html))
+
+
+def font_faces() -> str:
+    rules = [
+        '@font-face{font-family:"%s";font-style:%s;font-weight:%d;font-display:swap;src:url("fonts/%s") format("woff2")}'
+        % (fam, style, weight, f) for fam, style, weight, f in LOCAL_FONTS
+    ]
+    return "<style>\n" + "\n".join(rules) + "\n</style>"
+
+
+def document(fragment: str) -> str:
+    head, sep, rest = fragment.partition('<div class="app"')
+    return ('<!doctype html>\n<html lang="de">\n<head>\n<meta charset="utf-8">\n'
+            '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+            + PWA_HEAD + head + "</head>\n<body>\n" + sep + rest + "</body>\n</html>\n")
+
+
+def build_site() -> pathlib.Path:
+    out = ROOT / "site"
+    if out.exists():
+        shutil.rmtree(out)
+    (out / "fonts").mkdir(parents=True)
+    (out / "icons").mkdir()
+
+    html = document(body(font_faces(), PWA_SCRIPT))
+    (out / "index.html").write_text(html, encoding="utf-8")
+    for _, _, _, f in LOCAL_FONTS:
+        shutil.copy2(SRC / "fonts" / f, out / "fonts" / f)
+    shutil.copy2(SRC / "fonts" / "LICENSE-FONTS.txt", out / "fonts" / "LICENSE-FONTS.txt")
+    for f in ICONS:
+        shutil.copy2(SRC / "icons" / f, out / "icons" / f)
+    shutil.copy2(SRC / "pwa" / "manifest.webmanifest", out / "manifest.webmanifest")
+
+    assets = ["./", "index.html", "manifest.webmanifest"] + \
+             ["fonts/" + f for _, _, _, f in LOCAL_FONTS] + ["icons/" + f for f in ICONS]
+    digest = hashlib.sha256()
+    for a in assets[1:]:
+        digest.update((out / a).read_bytes())
+    version = digest.hexdigest()[:12]
+    sw = read("pwa/sw.js").replace("__VERSION__", version).replace("__ASSETS__", json.dumps(assets))
+    (out / "sw.js").write_text(sw, encoding="utf-8")
+    (out / ".nojekyll").write_text("", encoding="utf-8")
+    print(f"site/ gebaut, Version {version}, index.html {len(html) // 1024} KB")
+    return out
+
+
+def build_artifact() -> pathlib.Path:
+    out = ROOT / "dist" / "artifact.html"
+    out.parent.mkdir(exist_ok=True)
+    out.write_text(body(GOOGLE_FONTS, ""), encoding="utf-8")
+    print(f"dist/artifact.html gebaut ({out.stat().st_size // 1024} KB)")
+    return out
 
 
 if __name__ == "__main__":
-    frag = fragment()
-    if "--fragment" in sys.argv:
-        out = ROOT / "dist" / "artifact.html"
-        out.parent.mkdir(exist_ok=True)
-        out.write_text(frag, encoding="utf-8")
+    if "--artifact" in sys.argv:
+        build_artifact()
     else:
-        out = ROOT / "index.html"
-        out.write_text(document(frag), encoding="utf-8")
-    print(f"geschrieben: {out.relative_to(ROOT)} ({out.stat().st_size // 1024} KB)")
+        build_site()

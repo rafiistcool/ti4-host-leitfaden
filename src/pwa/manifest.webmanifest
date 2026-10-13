@@ -1,0 +1,26 @@
+{
+  "name": "TI4 Host-Leitfaden",
+  "short_name": "TI4 Host",
+  "description": "Geführter Rundenablauf und Regelreferenz für Twilight Imperium 4 mit Prophezeiung der Könige.",
+  "lang": "de",
+  "dir": "ltr",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#172033",
+  "theme_color": "#172033",
+  "categories": ["games", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Kampf", "short_name": "Kampf", "url": "./#kampf", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Regeln A–Z", "short_name": "Regeln", "url": "./#regeln", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Suche", "short_name": "Suche", "url": "./#suche", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
