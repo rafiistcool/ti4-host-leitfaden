@@ -51,6 +51,15 @@
     copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
     ext: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>',
     fwd: '<path d="M9 5l7 7-7 7"/>',
+    hub: '<path d="M12 2l2.4 6.6L21 9l-5.2 4.3L17.5 20 12 16.3 6.5 20l1.7-6.7L3 9l6.6-.4z"/>',
+    cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    pin: '<path d="M12 21s-6.5-6.2-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 14.8 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.3"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+    plus: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    trophy: '<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5M12 14v3M8.5 20h7M10 17h4v3h-4z"/>',
+    chart: '<path d="M5 20V12M10 20V6M15 20v-9M20 20V4"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     reset: '<path d="M4 4v6h6"/><path d="M5 15a8 8 0 1 0 2-8.5L4 10"/>'
   };
   function svg(name, size, color) {
@@ -439,6 +448,8 @@
       railLink("#ablauf", "ablauf", "Ablauf", onAblauf, "Runde " + st.round + " · " + phaseShort()) +
       (onAblauf ? railPhases() : "") +
       railLink("#kampf", "kampf", "Kampf", tab === "kampf") +
+      '<p class="rail-h">Spielrunde</p>' +
+      railLink("#hub", "hub", "Hub", route.rail === "hub", "Sessions, Fraktionen, Historie") +
       '<p class="rail-h">Vorbereitung</p>' +
       railLink("#aufbau", "aufbau", "Aufbau", route.rail === "aufbau") +
       railLink("#generator", "map", "Kartengenerator", route.rail === "generator") +
@@ -482,7 +493,7 @@
 
   function renderTabbar() {
     var tab = currentTab();
-    var items = [["#ablauf", "ablauf", "Ablauf", "ablauf"], ["#kampf", "kampf", "Kampf", "kampf"], ["#aufbau", "aufbau", "Aufbau", "aufbau"], ["#nachschlagen", "book", "Nachschlagen", "nachschlagen"], ["#suche", "search", "Suche", "suche"]];
+    var items = [["#ablauf", "ablauf", "Ablauf", "ablauf"], ["#kampf", "kampf", "Kampf", "kampf"], ["#aufbau", "aufbau", "Aufbau", "aufbau"], ["#nachschlagen", "book", "Nachschlagen", "nachschlagen"], ["#hub", "hub", "Hub", "hub"], ["#suche", "search", "Suche", "suche"]];
     document.getElementById("tabbar").innerHTML = items.map(function (it) {
       return '<a href="' + it[0] + '"' + (tab === it[3] ? ' aria-current="page"' : "") + ">" + svg(it[1], 22) + "<span>" + it[2] + "</span></a>";
     }).join("");
@@ -500,6 +511,7 @@
   }
 
   function render(scroll) {
+    document.body.classList.toggle("is-wide", route.v === "ext" && !!route.wide);
     renderRail(); renderTop(); renderView(); renderDock(); renderTabbar();
     var topH = document.getElementById("top").offsetHeight;
     document.documentElement.style.setProperty("--top-h", topH + "px");

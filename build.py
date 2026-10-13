@@ -9,6 +9,7 @@ Nur Python-Standardbibliothek, keine Abhängigkeiten.
 import hashlib
 import base64
 import json
+import os
 import pathlib
 import shutil
 import sys
@@ -18,7 +19,11 @@ SRC = ROOT / "src"
 DATA = ["data/ablauf.js", "data/themen.js", "data/regeln-1.js", "data/regeln-2.js",
         "data/tiles.js", "data/layouts.js", "data/fraktionen.js", "data/karten-1.js", "data/karten-2.js",
         "data/de-namen.js", "data/reference-assets.js", "data/original-assets.js", "data/english-sheets.js", "assets.js",
-        "map.js", "aufbau.js", "kompendium.js"]
+        "map.js", "aufbau.js", "kompendium.js", "hub.js"]
+
+# Adresse der Hub-API (Rust, Ordner server/). Standard: gleiche Adresse wie die Seite, nginx leitet /api/ weiter.
+# Für GitHub Pages mit eigenem Server z. B. HUB_API_URL=https://ti4.example.de/api/ setzen; leer = nur lokal speichern.
+HUB_API_URL = os.environ.get("HUB_API_URL", "api/")
 
 GOOGLE_FONTS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
@@ -62,8 +67,8 @@ def read(rel: str) -> str:
     return (SRC / rel).read_text(encoding="utf-8")
 
 
-def body(fonts_html: str, pwa_html: str) -> str:
-    data = "\n".join(read(p) for p in DATA)
+def body(fonts_html: str, pwa_html: str, hub_api: str = HUB_API_URL) -> str:
+    data = "window.TI4 = window.TI4 || {};\nTI4.hubApi = " + json.dumps(hub_api) + ";\n" + "\n".join(read(p) for p in DATA)
     return (read("index.template.html")
             .replace("<!--FONTS-->", fonts_html)
             .replace("/*STYLE*/", read("style.css"))
@@ -121,7 +126,7 @@ def build_site() -> pathlib.Path:
 def build_artifact() -> pathlib.Path:
     out = ROOT / "dist" / "artifact.html"
     out.parent.mkdir(exist_ok=True)
-    html = body(GOOGLE_FONTS, "")
+    html = body(GOOGLE_FONTS, "", "")
     # Preserve the single-file export: image paths inside JS and generated markup
     # are replaced by data URLs. Source PDFs remain linked to the publisher.
     for p in sorted((SRC / "assets").rglob("*")):
