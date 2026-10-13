@@ -1,5 +1,6 @@
 /* Hub für die Spielrunde: Spieler, geplante Sessions mit Fraktionswahl, Historie mit Siegpunkten, Statistiken.
-   Daten liegen auf dem Server (Rust-API aus server/, Adresse in TI4.hubApi). Ist keiner erreichbar, speichert der Hub nur lokal im Browser. */
+   Daten liegen auf dem Server (Rust-API aus server/, Adresse in TI4.hubApi). Ist keiner erreichbar, speichert der Hub nur lokal im Browser.
+   Mit Server: Anschauen darf jeder, Ändern nur mit Login. Dazu Profil, Admin-Bereich und Änderungsverlauf. */
 (function () {
   "use strict";
   var D = window.TI4;
@@ -56,6 +57,10 @@
   var data = { players: [], games: [] };
   var lastJson = "";
   var loadErr = "";
+  var me = null; // angemeldeter Benutzer { id, playerId, name, role } oder null
+  var auth = { signupOpen: false, setupNeeded: false };
+  function canEdit() { return mode === "local" || !!me; }
+  function isAdmin() { return mode === "server" && !!me && me.role === "admin"; }
 
   function problem(res) {
     return res.json().then(function (p) { return p && p.detail ? p.detail : "Fehler " + res.status; }, function () { return "Fehler " + res.status; })
@@ -136,7 +141,9 @@
     load: function () {
       if (!API) mode = "local";
       if (mode === "local") return Promise.resolve({ players: Local.players(), games: Local.games() });
-      return Promise.all([http("GET", "players"), http("GET", "games")]).then(function (r) { mode = "server"; return { players: r[0], games: r[1] }; });
+      return Promise.all([http("GET", "players"), http("GET", "games"), http("GET", "auth/me")]).then(function (r) {
+        mode = "server"; return { players: r[0], games: r[1], me: r[2] };
+      });
     },
     call: function (serverFn, localFn) {
       if (mode === "local") { try { return Promise.resolve(localFn()); } catch (e) { return Promise.reject(e); } }
@@ -156,7 +163,9 @@
       loadErr = "";
       var j = JSON.stringify(d);
       if (j === lastJson && !force) return false;
-      lastJson = j; data = d; return true;
+      lastJson = j; data = { players: d.players, games: d.games };
+      if (d.me) { me = d.me.user || null; auth = { signupOpen: !!d.me.signupOpen, setupNeeded: !!d.me.setupNeeded }; }
+      return true;
     }, function (e) {
       // Keine API vorhanden (GitHub Pages, Webserver ohne Backend): lokal im Browser arbeiten.
       if (mode !== "server" && e.status === 0) { mode = "local"; return refresh(true); }
@@ -169,7 +178,8 @@
   function act(promise, okMsg) {
     return promise.then(function (r) { if (okMsg) toast(okMsg); return refresh(true).then(function () { rerender(); return r; }); }, function (e) {
       toast(e.message || "Das hat nicht geklappt.", true);
-      var again = e.status === 409 || e.status === 404 ? refresh(true) : Promise.resolve();
+      // 401: Anmeldung abgelaufen, die Seite schaltet auf Nur-Lesen.
+      var again = e.status === 409 || e.status === 404 || e.status === 401 ? refresh(true) : Promise.resolve();
       return again.then(function () { rerender(); throw e; });
     });
   }
@@ -239,7 +249,10 @@
   /* ---------- Bausteine ---------- */
   var SUBNAV = [["hub", "Übersicht"], ["hub-sessions", "Sessions"], ["hub-spieler", "Spieler"], ["hub-fraktionen", "Fraktionen"]];
   function subnav(cur) {
-    return '<nav class="hb-nav" aria-label="Hub">' + SUBNAV.map(function (s) {
+    var items = SUBNAV.slice();
+    if (mode === "server" && me) items.push(["hub-verlauf", "Verlauf"]);
+    if (isAdmin()) items.push(["hub-admin", "Admin"]);
+    return '<nav class="hb-nav" aria-label="Hub">' + items.map(function (s) {
       return '<a href="#' + s[0] + '"' + (s[0] === cur ? ' aria-current="page"' : "") + ">" + s[1] + "</a>";
     }).join("") + "</nav>";
   }
@@ -249,8 +262,18 @@
     return "";
   }
   function head(cur) {
-    return '<header class="hb-head"><div class="hb-logo"><b>Twilight Imperium IV</b><span>Hub</span></div>' + subnav(cur) + "</header>" + modeNote();
+    var acct = mode !== "server" ? "" : me ?
+      '<a class="hb-acct' + (cur === "hub-profil" ? " on" : "") + '" href="#hub-profil">' + svg("user", 18) + "<span>" + esc(me.name) + "</span></a>" :
+      '<a class="hb-acct login' + (cur === "hub-login" ? " on" : "") + '" href="#hub-login">' + svg("lock", 18) + "<span>Anmelden</span></a>";
+    return '<header class="hb-head"><div class="hb-logo"><b>Twilight Imperium IV</b><span>Hub</span></div>' + subnav(cur) + acct + "</header>" + modeNote() + roNote(cur);
   }
+  // Ohne Login: Hinweis, dass hier nur angeschaut wird.
+  function roNote(cur) {
+    if (canEdit() || mode !== "server" || cur === "hub-login" || cur === "") return "";
+    return '<p class="hb-mode">' + svg("lock", 16) + '<span><b>Nur zum Anschauen.</b> Zum Planen, Wählen und Eintragen <a href="#hub-login">anmelden</a>.</span></p>';
+  }
+  // Wurzel jeder Ansicht. Ohne Login blendet .ro alle Bedienelemente mit data-w aus.
+  function root() { return '<div class="hb' + (canEdit() ? "" : " ro") + '">'; }
   function panelHead(icon, title, right) {
     return '<div class="hb-ph"><h2>' + svg(icon, 20) + "<span>" + title + "</span></h2>" + (right || "") + "</div>";
   }
@@ -266,9 +289,9 @@
     var g = nextGame();
     var h = head("hub") + hero(g) + '<div class="hb-grid"><div class="hb-main">';
     if (g) h += nextPanel(g) + factionPanel(g);
-    else h += '<section class="hb-panel hb-empty-panel"><p>Noch keine Session geplant.</p><button type="button" class="hb-btn gold" data-act="hb-plan">Nächste Session planen</button></section>';
+    else h += '<section class="hb-panel hb-empty-panel"><p>Noch keine Session geplant.</p><button type="button" class="hb-btn gold" data-w data-act="hb-plan">Nächste Session planen</button></section>';
     h += statsPanel() + '</div><aside class="hb-side">' + matchesPanel() + "</aside></div>";
-    return '<div class="hb">' + h + "</div>";
+    return root() + h + "</div>";
   }
 
   function hero(g) {
@@ -283,7 +306,7 @@
         (g.location ? "<span>" + svg("pin", 18) + esc(g.location) + "</span>" : "") + "</p>";
     }
     h += '</div><div class="hb-hero-side"><p class="hb-quote">' + esc(q) + "<small>Twilight Imperium IV</small></p>" +
-      (g ? '<a class="hb-btn gold" href="#hub-spiel-' + g.id + '">Zur Session ' + svg("takt", 16) + "</a>" : '<button type="button" class="hb-btn gold" data-act="hb-plan">Session planen</button>') +
+      (g ? '<a class="hb-btn gold" href="#hub-spiel-' + g.id + '">Zur Session ' + svg("takt", 16) + "</a>" : '<button type="button" class="hb-btn gold" data-w data-act="hb-plan">Session planen</button>') +
       "</div></section>";
     return h;
   }
@@ -297,7 +320,7 @@
   function nextPanel(g) {
     var right = '<div class="hb-meta"><span>' + svg("cal", 16) + esc(dLong(g.scheduledAt)) + "</span><span>" + svg("clock", 16) + esc(tm(g.scheduledAt)) + "</span>" +
       (g.location ? "<span>" + svg("pin", 16) + esc(g.location) + "</span>" : "") + "</div>" +
-      chip(g.status) + '<a class="hb-icon" href="#hub-spiel-' + g.id + '" aria-label="Session bearbeiten">' + svg("edit", 18) + "</a>";
+      chip(g.status) + '<a class="hb-icon" data-w href="#hub-spiel-' + g.id + '" aria-label="Session bearbeiten">' + svg("edit", 18) + "</a>";
     var picked = g.participants.filter(function (p) { return p.faction; }).length;
     var h = '<section class="hb-panel">' + panelHead("cal", "Nächste Session", right) +
       '<p class="hb-sub">Teilnehmer (' + picked + "/" + g.participants.length + " gewählt)</p>" +
@@ -306,14 +329,14 @@
         return '<div class="hb-seat' + (p.faction ? " has" : "") + (on ? " on" : "") + '" style="--fc:' + hue(p.faction) + '">' +
           '<div class="hb-seat-h"><span>' + esc(pname(p.playerId)) + "</span>" + (p.faction ? '<i class="hb-ok" title="Fraktion gewählt">✓</i>' : "") + "</div>" +
           '<div class="hb-seat-img">' + (p.faction ? portrait(p.faction, "hb-pt-big") : '<span class="hb-q">?</span>') + '<span class="hb-seat-f">' + esc(p.faction ? facLabel(p.faction) : "Noch offen") + "</span></div>" +
-          '<div class="hb-seat-a"><button type="button" class="hb-mini" data-act="hb-pick" data-p="' + p.playerId + '" aria-pressed="' + on + '">' + (on ? "Wählt…" : (p.faction ? "Ändern" : "Wählen")) + "</button>" +
+          '<div class="hb-seat-a" data-w><button type="button" class="hb-mini" data-act="hb-pick" data-p="' + p.playerId + '" aria-pressed="' + on + '">' + (on ? "Wählt…" : (p.faction ? "Ändern" : "Wählen")) + "</button>" +
           '<button type="button" class="hb-x" data-act="hb-unseat" data-p="' + p.playerId + '" aria-label="' + esc(pname(p.playerId)) + ' austragen">×</button></div></div>';
       }).join("") + (g.participants.length < 8 ? addSeat(g) : "") + "</div></section>";
     return h;
   }
   function addSeat(g) {
     var free = data.players.filter(function (p) { return !g.participants.some(function (x) { return x.playerId === p.id; }); });
-    return '<form class="hb-seat hb-add" data-form="hb-seat">' + svg("plus", 30) + '<span class="hb-add-t">Spieler eintragen</span>' +
+    return '<form class="hb-seat hb-add" data-w data-form="hb-seat">' + svg("plus", 30) + '<span class="hb-add-t">Spieler eintragen</span>' +
       '<label class="sr" for="hb-seat-sel">Spieler</label><select id="hb-seat-sel" name="player">' +
       free.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + "</option>"; }).join("") +
       '<option value="new">+ Neuer Spieler…</option></select>' +
@@ -324,9 +347,9 @@
   function factionPanel(g) {
     var takenBy = {};
     g.participants.forEach(function (p) { if (p.faction) takenBy[p.faction] = p.playerId; });
-    var hint = pickFor != null ? "<b>" + esc(pname(pickFor)) + "</b> wählt: Fraktion antippen. Nochmal antippen gibt sie wieder frei." :
+    var hint = !canEdit() ? "Welche Fraktionen schon vergeben sind. Wählen geht nach dem Anmelden." : pickFor != null ? "<b>" + esc(pname(pickFor)) + "</b> wählt: Fraktion antippen. Nochmal antippen gibt sie wieder frei." :
       "Oben bei einem Spieler auf „Wählen“ tippen, dann hier die Fraktion.";
-    var right = '<button type="button" class="hb-btn ghost" data-act="hb-reset">' + (resetArmed ? "Wirklich alle zurücksetzen?" : "Alle zurücksetzen") + "</button>";
+    var right = '<button type="button" class="hb-btn ghost" data-w data-act="hb-reset">' + (resetArmed ? "Wirklich alle zurücksetzen?" : "Alle zurücksetzen") + "</button>";
     return '<section class="hb-panel">' + panelHead("faction", "Fraktionen für die nächste Session", right) + '<p class="hb-hint">' + hint + "</p>" +
       '<div class="hb-facs">' + FAC.map(function (f) {
         var by = takenBy[f.id];
@@ -340,7 +363,7 @@
   function matchesPanel() {
     var list = finished().slice(0, 5);
     var h = '<section class="hb-panel hb-matches">' + panelHead("trophy", "Letzte Matches", '<a class="hb-more" href="#hub-sessions">Alle anzeigen ›</a>');
-    if (!list.length) return h + '<p class="hb-empty">Noch keine gespielten Partien. Nach dem Spiel die Session öffnen, Siegpunkte eintragen und auf „Gespielt“ stellen.</p><a class="hb-btn ghost" href="#hub-spiel-new-past">Vergangenes Spiel nachtragen</a></section>';
+    if (!list.length) return h + '<p class="hb-empty">Noch keine gespielten Partien. Nach dem Spiel die Session öffnen, Siegpunkte eintragen und auf „Gespielt“ stellen.</p><a class="hb-btn ghost" data-w href="#hub-spiel-new-past">Vergangenes Spiel nachtragen</a></section>';
     return h + list.map(function (g) {
       var w = winner(g);
       return '<a class="hb-match" href="#hub-spiel-' + g.id + '"><div><p class="hb-date">' + svg("cal", 15) + esc(dShort(g.scheduledAt)) + "</p>" +
@@ -366,11 +389,11 @@
   /* ---------- Sessions ---------- */
   function viewSessions() {
     var up = planned(), done = finished();
-    var h = head("hub-sessions") + '<div class="hb-actions"><button type="button" class="hb-btn gold" data-act="hb-plan">Neue Session planen</button>' +
+    var h = head("hub-sessions") + '<div class="hb-actions" data-w><button type="button" class="hb-btn gold" data-act="hb-plan">Neue Session planen</button>' +
       '<a class="hb-btn ghost" href="#hub-spiel-new-past">Vergangenes Spiel nachtragen</a></div>';
     h += '<section class="hb-panel">' + panelHead("cal", "Geplant") + (up.length ? up.map(row).join("") : '<p class="hb-empty">Nichts geplant.</p>') + "</section>";
     h += '<section class="hb-panel">' + panelHead("trophy", "Historie") + (done.length ? done.map(row).join("") : '<p class="hb-empty">Noch keine gespielten Partien.</p>') + "</section>";
-    return '<div class="hb">' + h + "</div>";
+    return root() + h + "</div>";
   }
   function row(g) {
     var list = g.status === "FINISHED" ? byPlacement(g) : g.participants;
@@ -402,9 +425,10 @@
     return draft;
   }
   function viewEditor(r) {
-    if (mode === "loading") return '<div class="hb">' + head("hub-sessions") + '<p class="hb-empty">Lädt…</p></div>';
+    if (mode === "loading") return root() + head("hub-sessions") + '<p class="hb-empty">Lädt…</p></div>';
+    if (!canEdit()) return viewGameReadOnly(r);
     var d = draftFor(r);
-    if (!d) return '<div class="hb">' + head("hub-sessions") + '<section class="hb-panel"><p class="hb-empty">Dieses Spiel gibt es nicht (mehr).</p><a class="hb-btn ghost" href="#hub-sessions">Zu den Sessions</a></section></div>';
+    if (!d) return root() + head("hub-sessions") + '<section class="hb-panel"><p class="hb-empty">Dieses Spiel gibt es nicht (mehr).</p><a class="hb-btn ghost" href="#hub-sessions">Zu den Sessions</a></section></div>';
     var fin = d.status === "FINISHED";
     var preview = fin ? withPlacements(d.participants.map(function (p) { return Object.assign({}, p, { placement: p.placement || null }); })) : d.participants;
     var used = {}; d.participants.forEach(function (p) { if (p.faction) used[p.faction] = 1; });
@@ -442,7 +466,7 @@
       '<div class="hb-actions"><button type="submit" class="hb-btn gold">Speichern</button><a class="hb-btn ghost" href="#' + (d.id && fin ? "hub-sessions" : "hub") + '">Abbrechen</a>' +
       (d.id ? '<span class="spacer"></span><button type="button" class="hb-btn danger" data-act="hb-del">' + (delArmed ? "Wirklich löschen?" : "Spiel löschen") + "</button>" : "") +
       "</div></form>";
-    return '<div class="hb">' + h + "</div>";
+    return root() + h + "</div>";
   }
   function saveDraft() {
     var d = draft;
@@ -468,9 +492,9 @@
   function viewPlayers() {
     var s = stats().players;
     var h = head("hub-spieler") + '<section class="hb-panel">' + panelHead("user", "Spieler") +
-      '<form class="hb-inline" data-form="hb-player"><label class="sr" for="hb-pn">Name</label><input id="hb-pn" name="name" placeholder="Neuer Spieler, z. B. Basti" maxlength="40" autocomplete="off" required>' +
+      '<form class="hb-inline" data-w data-form="hb-player"><label class="sr" for="hb-pn">Name</label><input id="hb-pn" name="name" placeholder="Neuer Spieler, z. B. Basti" maxlength="40" autocomplete="off" required>' +
       '<button type="submit" class="hb-btn gold">Hinzufügen</button></form>';
-    if (!s.length) return '<div class="hb">' + h + '<p class="hb-empty">Noch keine Spieler. Einfach oben Namen eintragen.</p></section></div>';
+    if (!s.length) return root() + h + '<p class="hb-empty">Noch keine Spieler.' + (canEdit() ? " Einfach oben Namen eintragen." : "") + "</p></section></div>";
     h += '<div class="hb-tbl"><table><thead><tr><th>Spieler</th><th class="num">Spiele</th><th class="num">Siege</th><th class="num">Ø Platz</th><th class="num">Ø SP</th><th>Liebste Fraktion</th><th></th></tr></thead><tbody>' +
       s.map(function (p) {
         var name = editPlayer === p.id ?
@@ -478,10 +502,10 @@
           "<b>" + esc(p.name) + "</b>";
         return "<tr><td>" + name + '</td><td class="num">' + p.played + '</td><td class="num">' + p.wins + '</td><td class="num">' + dec(p.avgPlace) + '</td><td class="num">' + dec(p.avgVp) + "</td>" +
           "<td>" + (p.fav ? '<span class="hb-tag" style="--fc:' + hue(p.fav) + '">' + portrait(p.fav, "hb-pt-xs") + esc(facLabel(p.fav)) + "<b>" + p.fac[p.fav] + "×</b></span>" : "–") + "</td>" +
-          '<td class="hb-td-a"><button type="button" class="hb-mini" data-act="hb-ren" data-p="' + p.id + '">Umbenennen</button>' +
+          '<td class="hb-td-a" data-w><button type="button" class="hb-mini" data-act="hb-ren" data-p="' + p.id + '">Umbenennen</button>' +
           '<button type="button" class="hb-mini danger" data-act="hb-pdel" data-p="' + p.id + '">' + (delPlayer === p.id ? "Wirklich?" : "Löschen") + "</button></td></tr>";
       }).join("") + "</tbody></table></div></section>";
-    return '<div class="hb">' + h + "</div>";
+    return root() + h + "</div>";
   }
 
   /* ---------- Fraktionen ---------- */
@@ -494,7 +518,207 @@
         return '<a class="hb-fac" style="--fc:' + hue(f.id) + '" href="#f-' + f.id + '">' + portrait(f.id, "hb-pt-fac") + '<span class="hb-fac-n">' + esc(facName(fac)) + "</span>" +
           '<span class="hb-fac-s">' + (f.played ? f.played + "× gespielt · " + f.wins + (f.wins === 1 ? " Sieg" : " Siege") : "Noch nie gespielt") + "</span></a>";
       }).join("") + "</div></section>";
-    return '<div class="hb">' + h + "</div>";
+    return root() + h + "</div>";
+  }
+
+
+  /* ---------- Nur anschauen (ohne Login) ---------- */
+  function viewGameReadOnly(r) {
+    var g = r.gid ? data.games.filter(function (x) { return x.id === r.gid; })[0] : null;
+    var h = head("hub-sessions") + '<section class="hb-panel">';
+    if (!g) h += panelHead("lock", "Anmelden zum Bearbeiten") + '<p class="hb-empty">Neue Sessions planen und Ergebnisse eintragen geht nach dem Anmelden.</p>';
+    else {
+      h += panelHead(g.status === "FINISHED" ? "trophy" : "cal", "Session", chip(g.status)) + row(g).replace(/^<a /, "<div ").replace(/<\/a>$/, "</div>").replace(/ href="[^"]*"/, "") +
+        (g.notes ? '<p class="hb-hint">' + esc(g.notes) + "</p>" : "");
+    }
+    return root() + h + '<div class="hb-actions"><a class="hb-btn gold" href="#hub-login">' + svg("lock", 16) + 'Anmelden</a><a class="hb-btn ghost" href="#hub-sessions">Zu den Sessions</a></div></section></div>';
+  }
+
+  /* ---------- Anmelden und Registrieren ---------- */
+  var regNew = false; // Registrieren mit neuem Spielernamen statt Auswahl
+  function pwFields(label) {
+    return '<label><span>' + label + '</span><input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="200" required></label>' +
+      '<label><span>Passwort wiederholen</span><input type="password" name="password2" autocomplete="new-password" minlength="8" maxlength="200" required></label>';
+  }
+  function viewLogin() {
+    if (mode === "local") return root() + head("") + '<section class="hb-panel"><p class="hb-empty">Ohne Hub-Server gibt es keine Accounts, hier wird nur auf diesem Gerät gespeichert.</p></section></div>';
+    if (me) return root() + head("hub-login") + '<section class="hb-panel">' + panelHead("user", "Angemeldet") + '<p>Du bist als <b>' + esc(me.name) + "</b> angemeldet.</p>" +
+      '<div class="hb-actions"><a class="hb-btn gold" href="#hub">Zum Hub</a><a class="hb-btn ghost" href="#hub-profil">Profil</a></div></section></div>';
+    var h = head("hub-login") + '<div class="hb-two">';
+    h += '<form class="hb-panel hb-form" data-form="hb-login">' + panelHead("lock", "Anmelden") +
+      '<div class="hb-fields one"><label><span>Spielername</span><input name="name" autocomplete="username" maxlength="40" required></label>' +
+      '<label><span>Passwort</span><input type="password" name="password" autocomplete="current-password" maxlength="200" required></label></div>' +
+      '<div class="hb-actions"><button type="submit" class="hb-btn gold">Anmelden</button></div>' +
+      '<p class="hb-hint">Passwort vergessen? Der Admin kann dir einen Link zum Zurücksetzen schicken.</p></form>';
+    if (!auth.signupOpen) {
+      h += '<section class="hb-panel">' + panelHead("user", "Registrieren") + '<p class="hb-empty">Die Registrierung ist gerade geschlossen. Frag den Admin nach einem Einladungslink.</p></section>';
+    } else {
+      var free = data.players.filter(function (p) { return !p.hasAccount; });
+      var useNew = regNew || !free.length;
+      h += '<form class="hb-panel hb-form" data-form="hb-register">' + panelHead("user", auth.setupNeeded ? "Admin einrichten" : "Registrieren") +
+        '<p class="hb-hint">' + (auth.setupNeeded ? "Es gibt noch keinen Admin. Den <b>Einrichtungscode</b> schreibt der Server beim Start ins Log (<code>docker logs ti4-hub-api</code>). Wer ihn eingibt, wird Admin." :
+          "Mit dem <b>Gruppencode</b> aus eurer Gruppe. Wähl deinen Spieler, damit deine bisherigen Spiele zu dir gehören.") + "</p>" +
+        '<div class="hb-fields one"><label><span>' + (auth.setupNeeded ? "Einrichtungscode" : "Gruppencode") + '</span><input name="code" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="40" required></label>' +
+        '<label><span>Wer bist du?</span><select name="player" data-hsel="reg">' + free.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + "</option>"; }).join("") +
+        '<option value="new"' + (useNew ? " selected" : "") + '>+ Ich bin neu…</option></select></label>' +
+        '<label' + (useNew ? "" : " hidden") + ' data-reg-new><span>Dein Name</span><input name="newname" maxlength="40" autocomplete="nickname"></label>' +
+        pwFields("Passwort (mind. 8 Zeichen)") + "</div>" +
+        '<div class="hb-actions"><button type="submit" class="hb-btn gold">' + (auth.setupNeeded ? "Als Admin registrieren" : "Registrieren") + "</button></div></form>";
+    }
+    return root() + h + "</div></div>";
+  }
+
+  /* ---------- Einladungslink ---------- */
+  var invite = null; // { token, info, err }
+  function viewInvite(r) {
+    var h = head("hub-login");
+    if (mode === "local") return root() + h + '<section class="hb-panel"><p class="hb-empty">Einladungen gehen nur mit Hub-Server.</p></section></div>';
+    if (!invite || invite.token !== r.token) {
+      invite = { token: r.token };
+      http("GET", "auth/invite/" + encodeURIComponent(r.token)).then(function (i) { invite.info = i; rerender(); }, function (e) { invite.err = e.message; rerender(); });
+    }
+    if (invite.err) return root() + h + '<section class="hb-panel"><p class="hb-empty">' + esc(invite.err) + '</p><a class="hb-btn ghost" href="#hub-login">Zum Anmelden</a></section></div>';
+    if (!invite.info) return root() + h + '<p class="hb-empty">Lädt…</p></div>';
+    var i = invite.info;
+    return root() + h + '<form class="hb-panel hb-form hb-narrow" data-form="hb-invite">' + panelHead("user", "Hallo " + esc(i.name) + "!") +
+      '<p class="hb-hint">' + (i.hasAccount ? "Hier legst du ein neues Passwort fest. Danach bist du auf allen anderen Geräten abgemeldet." : "Wähl ein Passwort, dann bist du drin. Angemeldet wird mit deinem Spielernamen <b>" + esc(i.name) + "</b>.") + "</p>" +
+      '<input type="text" name="username" value="' + esc(i.name) + '" autocomplete="username" hidden>' +
+      '<div class="hb-fields one">' + pwFields("Passwort (mind. 8 Zeichen)") + "</div>" +
+      '<div class="hb-actions"><button type="submit" class="hb-btn gold">' + (i.hasAccount ? "Passwort speichern" : "Account anlegen") + "</button></div></form></div>";
+  }
+
+  /* ---------- Profil ---------- */
+  var delMeArmed = false;
+  function needLogin(cur) {
+    return root() + head(cur) + '<section class="hb-panel"><p class="hb-empty">Dafür bitte zuerst anmelden.</p><div class="hb-actions"><a class="hb-btn gold" href="#hub-login">Anmelden</a></div></section></div>';
+  }
+  function viewProfile() {
+    if (mode !== "server" || !me) return needLogin("hub-profil");
+    var h = head("hub-profil") + '<div class="hb-two">';
+    h += '<form class="hb-panel hb-form" data-form="hb-rename-me">' + panelHead("user", "Profil", '<span class="hb-chip ' + (me.role === "admin" ? "plan" : "done") + '">' + (me.role === "admin" ? "Admin" : "Mitglied") + "</span>") +
+      '<div class="hb-fields one"><label><span>Spielername (damit meldest du dich an)</span><input name="name" value="' + esc(me.name) + '" maxlength="40" required></label></div>' +
+      '<div class="hb-actions"><button type="submit" class="hb-btn ghost">Namen speichern</button></div></form>';
+    h += '<form class="hb-panel hb-form" data-form="hb-pw">' + panelHead("lock", "Passwort ändern") +
+      '<input type="text" name="username" value="' + esc(me.name) + '" autocomplete="username" hidden>' +
+      '<div class="hb-fields one"><label><span>Aktuelles Passwort</span><input type="password" name="current" autocomplete="current-password" maxlength="200" required></label>' +
+      pwFields("Neues Passwort (mind. 8 Zeichen)") + "</div>" +
+      '<div class="hb-actions"><button type="submit" class="hb-btn gold">Passwort ändern</button></div>' +
+      '<p class="hb-hint">Andere Geräte werden dabei abgemeldet, dieses bleibt angemeldet.</p></form>';
+    h += '<section class="hb-panel">' + panelHead("reset", "Abmelden") +
+      '<div class="hb-actions"><button type="button" class="hb-btn ghost" data-act="hb-logout">Abmelden</button><button type="button" class="hb-btn ghost" data-act="hb-logout-all">Auf allen Geräten abmelden</button></div></section>';
+    h += '<form class="hb-panel hb-form" data-form="hb-delme">' + panelHead("info", "Account löschen") +
+      '<p class="hb-hint">Dein Spieler und eure Historie bleiben erhalten, nur dein Login verschwindet. Mit einem Einladungslink vom Admin kannst du später wieder einsteigen.</p>' +
+      '<div class="hb-fields one"><label><span>Zur Bestätigung dein Passwort</span><input type="password" name="password" autocomplete="current-password" maxlength="200" required></label></div>' +
+      '<div class="hb-actions"><button type="submit" class="hb-btn danger">' + (delMeArmed ? "Wirklich endgültig löschen?" : "Account löschen") + "</button></div></form>";
+    return root() + h + "</div></div>";
+  }
+
+  /* ---------- Admin ---------- */
+  var adminData = null, adminLoading = false, inviteOut = null, accDel = null;
+  function loadAdmin() {
+    if (adminLoading) return;
+    adminLoading = true;
+    Promise.all([http("GET", "admin/settings"), http("GET", "admin/accounts")]).then(function (r) {
+      adminLoading = false; adminData = { settings: r[0], accounts: r[1] }; rerender();
+    }, function (e) { adminLoading = false; adminData = { err: e.message }; rerender(); });
+  }
+  function ago(iso) {
+    if (!iso) return "noch nie";
+    var d = new Date(iso);
+    return isNaN(d) ? "–" : DF_SHORT.format(d) + ", " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+  function viewAdmin() {
+    if (!isAdmin()) return needLogin("hub-admin");
+    var h = head("hub-admin");
+    if (!adminData) { loadAdmin(); return root() + h + '<p class="hb-empty">Lädt…</p></div>'; }
+    if (adminData.err) return root() + h + '<p class="hb-mode bad">' + esc(adminData.err) + "</p></div>";
+    var st = adminData.settings, accs = adminData.accounts;
+    h += '<div class="hb-two">';
+    h += '<section class="hb-panel">' + panelHead("lock", "Registrierung", '<span class="hb-chip ' + (st.signupOpen ? "done" : "plan") + '">' + (st.signupOpen ? "Offen" : "Geschlossen") + "</span>") +
+      '<p class="hb-hint">' + (st.signupOpen ? "Wer den Gruppencode kennt, kann sich gerade registrieren. Wenn alle drin sind: schließen." :
+        "Niemand kann sich selbst registrieren. Nachzügler bekommen unten einen Einladungslink.") + "</p>" +
+      (st.signupCode ? '<div class="hb-code"><span>Gruppencode</span><b>' + esc(st.signupCode) + '</b><button type="button" class="hb-mini" data-act="hb-copy" data-copy="' + esc(st.signupCode) + '">Kopieren</button></div>' : '<p class="hb-hint">Noch kein Gruppencode festgelegt.</p>') +
+      '<form class="hb-inline" data-form="hb-code"><label class="sr" for="hb-code-in">Neuer Gruppencode</label><input id="hb-code-in" name="code" minlength="6" maxlength="40" placeholder="Neuer Gruppencode" autocomplete="off" required>' +
+      '<button type="button" class="hb-btn ghost" data-act="hb-code-rand">Zufällig</button><button type="submit" class="hb-btn ghost">Code setzen</button></form>' +
+      '<div class="hb-actions"><button type="button" class="hb-btn ' + (st.signupOpen ? "danger" : "gold") + '" data-act="hb-signup" data-v="' + (st.signupOpen ? "0" : "1") + '">' +
+      (st.signupOpen ? "Registrierung schließen" : "Registrierung öffnen") + "</button></div></section>";
+    var invitePanel = inviteOut ? '<div class="hb-code wide"><span>Link für ' + esc(inviteOut.name) + " (7 Tage gültig, einmal benutzbar)</span><b>" + esc(inviteOut.url) + '</b><button type="button" class="hb-mini" data-act="hb-copy" data-copy="' + esc(inviteOut.url) + '">Kopieren</button></div>' : "";
+    var noAcc = data.players.filter(function (p) { return !p.hasAccount; });
+    h += '<section class="hb-panel">' + panelHead("user", "Einladen") +
+      '<p class="hb-hint">Ein Link für einen Spieler: zum Registrieren, auch wenn die Registrierung zu ist. Bei bestehendem Account setzt er das Passwort zurück.</p>' + invitePanel +
+      (noAcc.length ? '<div class="hb-row-p">' + noAcc.map(function (p) { return '<button type="button" class="hb-mini" data-act="hb-invite" data-p="' + p.id + '">' + esc(p.name) + " einladen</button>"; }).join("") + "</div>" :
+        '<p class="hb-empty">Alle Spieler haben einen Account.</p>') + "</section></div>";
+    h += '<section class="hb-panel">' + panelHead("user", "Accounts (" + accs.length + ")") + '<div class="hb-tbl"><table><thead><tr><th>Spieler</th><th>Rolle</th><th>Zuletzt da</th><th></th></tr></thead><tbody>' +
+      accs.map(function (a) {
+        var self = a.id === me.id;
+        return "<tr><td><b>" + esc(a.name) + "</b>" + (self ? " <small>(du)</small>" : "") + "</td><td>" + (a.role === "admin" ? "Admin" : "Mitglied") + "</td><td>" + esc(ago(a.lastSeen)) + "</td>" +
+          '<td class="hb-td-a"><button type="button" class="hb-mini" data-act="hb-role" data-a="' + a.id + '" data-v="' + (a.role === "admin" ? "member" : "admin") + '">' + (a.role === "admin" ? "Admin entfernen" : "Zum Admin") + "</button>" +
+          '<button type="button" class="hb-mini" data-act="hb-invite" data-p="' + a.playerId + '">Passwort-Link</button>' +
+          '<button type="button" class="hb-mini danger" data-act="hb-acc-del" data-a="' + a.id + '">' + (accDel === a.id ? "Wirklich?" : "Löschen") + "</button></td></tr>";
+      }).join("") + "</tbody></table></div>" +
+      '<p class="hb-hint">Löschen entfernt nur den Login. Der Spieler und seine Spiele bleiben.</p></section>';
+    return root() + h + "</div>";
+  }
+  function adminCall(method, path, body, okMsg) {
+    return act(http(method, path, body), okMsg).then(function (r) { adminData = null; rerender(); return r; }, function () { adminData = null; rerender(); });
+  }
+
+  /* ---------- Verlauf ---------- */
+  var audit = null, auditLoading = false;
+  function loadAudit() {
+    if (auditLoading) return;
+    auditLoading = true;
+    http("GET", "audit").then(function (l) { auditLoading = false; audit = l; rerender(); }, function (e) { auditLoading = false; audit = { err: e.message }; rerender(); });
+  }
+  function gameLabel(g) { return g ? "Session vom " + dShort(g.scheduledAt) : "Session"; }
+  function describe(e) {
+    var b = e.before, a = e.after;
+    if (e.entity === "player") {
+      if (e.action === "create") return "hat Spieler „" + esc(a.name) + "“ angelegt";
+      if (e.action === "delete") return "hat Spieler „" + esc(b.name) + "“ gelöscht";
+      if (e.action === "undo") return "hat eine Änderung an „" + esc((a || b).name) + "“ rückgängig gemacht";
+      return "hat „" + esc(b.name) + "“ in „" + esc(a.name) + "“ umbenannt";
+    }
+    var lbl = esc(gameLabel(a || b));
+    if (e.action === "create") return "hat die " + lbl + (a.status === "FINISHED" ? " nachgetragen" : " geplant");
+    if (e.action === "delete") return "hat die " + lbl + " gelöscht";
+    if (e.action === "undo") return "hat eine Änderung an der " + lbl + " rückgängig gemacht";
+    if (b.status === "PLANNED" && a.status === "FINISHED") return "hat das Ergebnis der " + lbl + " eingetragen";
+    var fb = b.participants.map(function (p) { return p.playerId + ":" + p.faction; }).join(), fa = a.participants.map(function (p) { return p.playerId + ":" + p.faction; }).join();
+    if (fb !== fa && b.participants.length === a.participants.length && b.scheduledAt === a.scheduledAt) return "hat Fraktionen für die " + lbl + " geändert";
+    return "hat die " + lbl + " geändert";
+  }
+  function viewHistory() {
+    if (mode !== "server" || !me) return needLogin("hub-verlauf");
+    var h = head("hub-verlauf");
+    if (!audit) { loadAudit(); return root() + h + '<p class="hb-empty">Lädt…</p></div>'; }
+    if (audit.err) return root() + h + '<p class="hb-mode bad">' + esc(audit.err) + "</p></div>";
+    h += '<section class="hb-panel">' + panelHead("clock", "Verlauf") +
+      '<p class="hb-hint">Wer wann was geändert hat, die letzten 200 Einträge.' + (isAdmin() ? " Als Admin kannst du Änderungen rückgängig machen, solange danach nichts mehr daran geändert wurde." : " Rückgängig machen kann der Admin.") + "</p>" +
+      (audit.length ? '<ol class="hb-log">' + audit.map(function (e) {
+        return '<li class="' + (e.undone ? "undone" : "") + '"><time>' + esc(ago(e.at)) + "</time><span><b>" + esc(e.actor) + "</b> " + describe(e) + (e.undone ? " <small>(rückgängig gemacht)</small>" : "") + "</span>" +
+          (isAdmin() && !e.undone ? '<button type="button" class="hb-mini" data-act="hb-undo" data-a="' + e.id + '">Rückgängig</button>' : "") + "</li>";
+      }).join("") + "</ol>" : '<p class="hb-empty">Noch keine Änderungen.</p>') + "</section>";
+    return root() + h + "</div>";
+  }
+  function copy(text) {
+    var done = function () { toast("Kopiert"); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { prompt("Zum Kopieren:", text); });
+    else prompt("Zum Kopieren:", text);
+  }
+  function randomCode() {
+    var a = "abcdefghjkmnpqrstuvwxyz23456789", out = "", buf = new Uint32Array(10);
+    crypto.getRandomValues(buf);
+    for (var i = 0; i < buf.length; i++) { out += a[buf[i] % a.length]; if (i === 4) out += "-"; }
+    return out;
+  }
+  function signedIn(r, msg) {
+    me = r.user; adminData = null; audit = null;
+    return refresh(true).then(function () { toast(msg); U().go("hub"); });
+  }
+  function pwPair(f) {
+    if (f.elements.password.value !== f.elements.password2.value) { toast("Die beiden Passwörter sind nicht gleich.", true); f.elements.password2.focus(); return null; }
+    return f.elements.password.value;
   }
 
   /* ---------- Ereignisse ---------- */
@@ -512,10 +736,30 @@
     act(Store.saveGame(null, req), "Session angelegt").then(function (g) { U().go("hub-spiel-" + g.id); }, function () {});
   }
 
+  // Aktionen, die etwas ändern und darum einen Login brauchen.
+  var WRITE = { "hb-plan": 1, "hb-pick": 1, "hb-fac": 1, "hb-unseat": 1, "hb-reset": 1, "hb-del": 1, "hb-ren": 1, "hb-pdel": 1 };
   function click(a, t, ev) {
     if (a.indexOf("hb-") !== 0) return false;
-    var pid = +t.getAttribute("data-p"), i = +t.getAttribute("data-i");
+    var pid = +t.getAttribute("data-p"), i = +t.getAttribute("data-i"), aid = +t.getAttribute("data-a");
+    if (WRITE[a] && !canEdit()) { toast("Zum Ändern bitte anmelden."); return true; }
     if (a === "hb-plan") plan();
+    else if (a === "hb-logout") act(http("POST", "auth/logout"), "Abgemeldet").then(function () { me = null; U().go("hub"); }, function () {});
+    else if (a === "hb-logout-all") act(http("POST", "me/logout-all"), "Überall abgemeldet").then(function () { me = null; U().go("hub"); }, function () {});
+    else if (a === "hb-copy") copy(t.getAttribute("data-copy"));
+    else if (a === "hb-code-rand") { var ci = document.getElementById("hb-code-in"); ci.value = randomCode(); ci.focus(); }
+    else if (a === "hb-signup") adminCall("PUT", "admin/settings", { signupOpen: t.getAttribute("data-v") === "1" }, t.getAttribute("data-v") === "1" ? "Registrierung offen" : "Registrierung geschlossen");
+    else if (a === "hb-role") adminCall("PUT", "admin/accounts/" + aid, { role: t.getAttribute("data-v") }, "Rolle geändert");
+    else if (a === "hb-acc-del") {
+      if (accDel !== aid) { accDel = aid; rerender(); }
+      else { accDel = null; adminCall("DELETE", "admin/accounts/" + aid, undefined, "Account gelöscht"); }
+    }
+    else if (a === "hb-invite") {
+      act(http("POST", "admin/invites", { playerId: pid })).then(function (r) {
+        inviteOut = { name: r.name, url: location.href.split("#")[0] + "#hub-einladung-" + r.token };
+        adminData = null; rerender(); copy(inviteOut.url);
+      }, function () {});
+    }
+    else if (a === "hb-undo") act(http("POST", "audit/" + aid + "/undo"), "Rückgängig gemacht").then(function () { audit = null; rerender(); }, function () { audit = null; rerender(); });
     else if (a === "hb-pick") { pickFor = pickFor === pid ? null : pid; rerender(); }
     else if (a === "hb-fac") {
       if (pickFor == null) { toast("Erst oben bei einem Spieler auf „Wählen“ tippen."); return true; }
@@ -568,6 +812,11 @@
   }
   function change(ev) {
     var el = ev.target;
+    if (el.getAttribute && el.getAttribute("data-hsel") === "reg") {
+      regNew = el.value === "new";
+      var box = el.form.querySelector("[data-reg-new]"); box.hidden = !regNew; if (regNew) box.querySelector("input").focus();
+      return true;
+    }
     if (el.getAttribute && el.getAttribute("data-hp") === "faction") { syncDraft(); rerender(); return true; }
     if (el.id === "hb-add-sel" || el.id === "hb-seat-sel") {
       var nn = el.parentNode.querySelector(el.id === "hb-add-sel" ? "#hb-add-new" : ".hb-add-new");
@@ -593,6 +842,38 @@
     var f = ev.target.getAttribute && ev.target.getAttribute("data-form");
     if (!f || f.indexOf("hb-") !== 0) return;
     ev.preventDefault();
+    var form = ev.target, el = form.elements;
+    if (f === "hb-login") {
+      http("POST", "auth/login", { name: el.name.value, password: el.password.value }).then(function (r) { return signedIn(r, "Hallo " + r.user.name + "!"); },
+        function (e) { toast(e.message, true); el.password.value = ""; el.password.focus(); });
+      return;
+    }
+    if (f === "hb-register") {
+      var pw = pwPair(form); if (pw == null) return;
+      var body = { code: el.code.value, password: pw };
+      if (el.player.value === "new") body.name = el.newname.value; else body.playerId = +el.player.value;
+      http("POST", "auth/register", body).then(function (r) { regNew = false; return signedIn(r, "Willkommen, " + r.user.name + "!"); }, function (e) { toast(e.message, true); });
+      return;
+    }
+    if (f === "hb-invite") {
+      var pw2 = pwPair(form); if (pw2 == null) return;
+      http("POST", "auth/invite/" + encodeURIComponent(invite.token), { password: pw2 }).then(function (r) { invite = null; return signedIn(r, "Alles klar, " + r.user.name + ", du bist angemeldet."); },
+        function (e) { toast(e.message, true); });
+      return;
+    }
+    if (f === "hb-pw") {
+      var pw3 = pwPair(form); if (pw3 == null) return;
+      act(http("PUT", "me/password", { current: el.current.value, password: pw3 }), "Passwort geändert").then(function () { form.reset(); }, function () {});
+      return;
+    }
+    if (f === "hb-rename-me") { act(Store.renamePlayer(me.playerId, el.name.value), "Name gespeichert").catch(function () {}); return; }
+    if (f === "hb-delme") {
+      if (!delMeArmed) { delMeArmed = true; var keep = el.password.value; rerender(); var np = document.querySelector('[data-form="hb-delme"] input[name="password"]'); if (np) np.value = keep; return; }
+      delMeArmed = false;
+      act(http("DELETE", "me", { password: el.password.value }), "Account gelöscht").then(function () { me = null; U().go("hub"); }, function () {});
+      return;
+    }
+    if (f === "hb-code") { adminCall("PUT", "admin/settings", { signupCode: el.code.value }, "Gruppencode gesetzt"); return; }
     if (f === "hb-game") { syncDraft(); saveDraft(); }
     else if (f === "hb-player") {
       var inp = ev.target.elements.name;
@@ -636,6 +917,12 @@
       if (h === "hub-sessions") return Object.assign(base, { page: "sessions", title: "Sessions" });
       if (h === "hub-spieler") return Object.assign(base, { page: "players", title: "Spieler" });
       if (h === "hub-fraktionen") return Object.assign(base, { page: "factions", title: "Fraktionen" });
+      if (h === "hub-login") return Object.assign(base, { page: "login", title: "Anmelden" });
+      if (h === "hub-profil") return Object.assign(base, { page: "profile", title: "Profil" });
+      if (h === "hub-admin") return Object.assign(base, { page: "admin", title: "Admin" });
+      if (h === "hub-verlauf") return Object.assign(base, { page: "history", title: "Verlauf" });
+      var inv = /^hub-einladung-([0-9a-f]{16,128})$/.exec(h);
+      if (inv) return Object.assign(base, { page: "invite", token: inv[1], title: "Einladung" });
       if (h === "hub-spiel-new") return Object.assign(base, { page: "new", title: "Neue Session" });
       if (h === "hub-spiel-new-past") return Object.assign(base, { page: "new-past", title: "Spiel nachtragen" });
       var m = /^hub-spiel-(\d+)$/.exec(h);
@@ -645,14 +932,23 @@
     render: function (r) {
       if (r.page !== "edit" && r.page !== "new" && r.page !== "new-past") draft = null;
       if (r.page !== "overview") pickFor = null;
+      if (r.page !== "profile") delMeArmed = false;
+      // Admin-Daten und Verlauf bei jedem Öffnen frisch holen.
+      if (r.page !== "admin") { adminData = null; inviteOut = null; accDel = null; }
+      if (r.page !== "history") audit = null;
       if (mode === "loading") {
         refresh(true).then(rerender);
-        return '<div class="hb">' + head(r.page === "overview" ? "hub" : "") + '<p class="hb-empty">Lädt…</p></div>';
+        return root() + head(r.page === "overview" ? "hub" : "") + '<p class="hb-empty">Lädt…</p></div>';
       }
       if (r.page === "overview") return viewOverview();
       if (r.page === "sessions") return viewSessions();
       if (r.page === "players") return viewPlayers();
       if (r.page === "factions") return viewFactionStats();
+      if (r.page === "login") return viewLogin();
+      if (r.page === "invite") return viewInvite(r);
+      if (r.page === "profile") return viewProfile();
+      if (r.page === "admin") return viewAdmin();
+      if (r.page === "history") return viewHistory();
       return viewEditor(r);
     },
     click: click, change: change, input: input

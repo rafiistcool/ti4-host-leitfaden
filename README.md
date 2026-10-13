@@ -10,14 +10,14 @@ Host-Begleiter für **Twilight Imperium: Vierte Edition** mit **Prophezeiung der
 - **Materialbilder**: 110 deutsche Originalabbildungen aus den Asmodee-PDFs und 48 englische Originalbögen für die 24 Grundspiel-/PoK-Fraktionen über TI4 Ultimate. Deutsche Originale werden bevorzugt; deutsche Textfassungen und Kurzreferenzen bleiben verfügbar. Jede Abbildung nennt Sprache, Edition und Quelle und lässt sich vergrößern. Weitere fehlende Bilder werden durch beschriftete deutsche SVG-Referenzhilfen ergänzt.
 - **Nachschlagen**: Themen (Taktikaktion, „Wann darf ich…?“, Handel, Strategiekarten, Limits und Einheitenwerte, PoK-Neuerungen, Aufbau) und eine **Regelreferenz A–Z** mit allen 101 Einträgen der Living Rules Reference 2.0, in eigenen Worten und mit den Absatznummern des offiziellen deutschen Regelhefts.
 - **Suche** über Ablauf, Themen, Regeln, Fraktionen und Karten. Umlaute gehen auch als ae/oe/ue, englische Begriffe werden mitgefunden.
-- **Hub für eure Spielrunde**: Countdown zur nächsten Session, wer dabei ist und welche Fraktion gewählt hat (Fraktionsraster zum Antippen), Historie aller Partien mit Siegpunkten, Platzierungen und Sieger, Spieler- und Fraktionsstatistiken. Ohne Accounts: Jeder kann Spieler anlegen, Sessions planen und Ergebnisse eintragen.
+- **Hub für eure Spielrunde**: Countdown zur nächsten Session, wer dabei ist und welche Fraktion gewählt hat (Fraktionsraster zum Antippen), Historie aller Partien mit Siegpunkten, Platzierungen und Sieger, Spieler- und Fraktionsstatistiken. Anschauen kann jeder, Ändern nur mit Login. Registrieren geht mit einem Gruppencode, dazu Profil (Passwort ändern, Account löschen), Admin-Bereich und ein Verlauf, in dem der Admin Änderungen rückgängig machen kann.
 - **Offline**: Nach dem ersten Öffnen funktioniert alles ohne Netz, Schriften und Icons werden mitgeliefert.
 
 Fortschritt und Häkchen werden nur lokal im Browser gespeichert (`localStorage`). Die Hub-Daten liegen dagegen auf einem kleinen Server (Rust, Ordner `server/`), damit alle denselben Stand sehen. Läuft keiner (z. B. bei GitHub Pages), speichert der Hub nur im eigenen Browser und sagt das auch.
 
 ## Hub-Server (Rust)
 
-`server/` ist ein schlanker Rust-Server (axum, SQLite über rusqlite) mit REST-API unter `/api`: ein Binary von gut 3 MB, die Daten liegen in einer einzigen Datei `ti4hub.db`. Kein Login: Wer die Seite öffnen kann, kann auch bearbeiten.
+`server/` ist ein schlanker Rust-Server (axum, SQLite über rusqlite) mit REST-API unter `/api`: ein Binary von gut 3 MB, die Daten liegen in einer einzigen Datei `ti4hub.db`. Lesen ist offen, alles Schreibende braucht einen Login.
 
 | Methode | Pfad | Zweck |
 |---|---|---|
@@ -26,6 +26,18 @@ Fortschritt und Häkchen werden nur lokal im Browser gespeichert (`localStorage`
 | `GET/POST` | `/api/games` | alle Sessions (neueste zuerst), anlegen |
 | `GET/PUT/DELETE` | `/api/games/{id}` | eine Session lesen, ändern, löschen |
 | `GET` | `/api/health` | Healthcheck |
+| `GET` | `/api/auth/me` | wer angemeldet ist, ob die Registrierung offen ist |
+| `POST` | `/api/auth/login`, `/api/auth/logout` | anmelden (`{"name", "password"}`), abmelden |
+| `POST` | `/api/auth/register` | registrieren mit Gruppencode (`{"code", "playerId" oder "name", "password"}`) |
+| `GET/POST` | `/api/auth/invite/{token}` | Einladungslink prüfen, Passwort setzen |
+| `PUT` | `/api/me/password` | Passwort ändern (`{"current", "password"}`) |
+| `POST` | `/api/me/logout-all` | auf allen Geräten abmelden |
+| `DELETE` | `/api/me` | eigenen Account löschen (`{"password"}`), Spieler und Spiele bleiben |
+| `GET/PUT` | `/api/admin/settings` | Admin: Gruppencode, Registrierung offen/zu |
+| `GET`, `PUT/DELETE` | `/api/admin/accounts`, `/api/admin/accounts/{id}` | Admin: Accounts, Rolle ändern, löschen |
+| `POST` | `/api/admin/invites` | Admin: Einladungs- bzw. Passwort-Link für einen Spieler (7 Tage, einmal) |
+| `GET` | `/api/audit` | Verlauf (angemeldet) |
+| `POST` | `/api/audit/{id}/undo` | Admin: Änderung rückgängig machen |
 
 Eine Session hat Termin, Ort, Status (`PLANNED`/`FINISHED`), Siegpunkte zum Sieg und Teilnehmer mit Fraktion, Siegpunkten und Platz. Fehlt bei einem gespielten Spiel ein Platz, ergibt sich die Reihenfolge aus den Siegpunkten. Gleichzeitige Änderungen fängt optimistisches Sperren ab (`version`, Antwort 409). Fehler kommen als Problem Details mit deutschem `detail`.
 
@@ -35,7 +47,16 @@ cargo run                    # http://localhost:8080/api/players, Daten in serve
 cargo test                   # Tests
 ```
 
-Konfiguration über Umgebungsvariablen: `TI4_DATA_DIR` (Datenordner, im Container `/data`), `PORT` (Standard 8080), `TI4_CORS_ALLOWED_ORIGINS` (nur wenn Seite und API unter verschiedenen Adressen laufen). Beim Bauen der Seite legt `HUB_API_URL` fest, wo die Seite die API sucht (Standard `api/`, also dieselbe Adresse; leer = nur lokal).
+### Accounts und Login
+
+- **Erster Admin:** Solange es keinen Admin gibt, schreibt der Server beim Start einen Einrichtungscode ins Log (`docker logs ti4-hub-api`). Im Hub auf **Anmelden › Admin einrichten** mit diesem Code registrieren, dann bist du Admin.
+- **Freunde dazuholen:** Im Admin-Bereich einen Gruppencode setzen und die Registrierung öffnen. Jeder registriert sich mit dem Code, wählt seinen Spieler (damit gehören die bisherigen Spiele zu ihm) und ein Passwort. Wenn alle drin sind, Registrierung schließen.
+- **Nachzügler, Passwort vergessen:** Im Admin-Bereich einen Einladungslink für den Spieler erzeugen und schicken. Er ist 7 Tage gültig und nur einmal benutzbar.
+- **Mitglieder** dürfen Sessions planen und bearbeiten, Spieler anlegen und sich selbst umbenennen. Spieler mit Account umbenennen, Rollen, Accounts und Rückgängig sind Sache des Admins.
+- Passwörter liegen nur als Argon2-Hash in der Datenbank. Die Anmeldung ist ein `HttpOnly`/`SameSite=Strict`-Cookie und gilt 30 Tage ab der letzten Nutzung. Nach 10 falschen Passwörtern für einen Namen (30 pro Adresse) ist 15 Minuten Pause.
+- **Sicherungen:** Einmal am Tag legt der Server eine Kopie der Datenbank in `backup/` im Datenordner ab und behält die letzten 14.
+
+Konfiguration über Umgebungsvariablen: `TI4_DATA_DIR` (Datenordner, im Container `/data`), `PORT` (Standard 8080), `TI4_CORS_ALLOWED_ORIGINS` (nur wenn Seite und API unter verschiedenen Adressen laufen; Login klappt nur, wenn beide unter derselben Adresse laufen), `TI4_COOKIE_SECURE` (`true`/`false`, Standard: automatisch, wenn der Proxy `X-Forwarded-Proto: https` schickt), `TI4_BACKUP_KEEP` (Anzahl täglicher Sicherungen, Standard 14, `0` = aus). Beim Bauen der Seite legt `HUB_API_URL` fest, wo die Seite die API sucht (Standard `api/`, also dieselbe Adresse; leer = nur lokal).
 
 ## Hosten
 
@@ -71,7 +92,7 @@ docker compose up -d --build
 
 `docker-compose.yml` startet zwei Container: `ti4-host` (nginx mit der Seite) und `ti4-hub-api` (Rust, Image `ghcr.io/rafiistcool/ti4-host-leitfaden-api`). Die Hub-Daten liegen im Volume `ti4-hub-data`; zum Sichern reicht eine Kopie davon.
 
-Im Container liefert nginx die Seite aus und leitet `/api/` an den Hub-Server weiter (`docker/nginx.conf`). Für HTTPS den Container hinter einen Reverse Proxy hängen, zum Beispiel Caddy:
+Im Container liefert nginx die Seite aus und leitet `/api/` an den Hub-Server weiter (`docker/nginx.conf`). Für HTTPS den Container hinter einen Reverse Proxy hängen, zum Beispiel Caddy. Mit Login ist HTTPS Pflicht, sonst gehen Passwörter im Klartext übers Netz. Der Proxy sollte `X-Forwarded-Proto` setzen (Caddy, Traefik und Nginx Proxy Manager machen das von selbst), dann bekommt das Login-Cookie automatisch `Secure`:
 
 ```
 ti4.example.de {
@@ -98,7 +119,7 @@ src/
   map.js                Spielplan-Geometrie, gezeichnete Systemtafeln, Generator
   aufbau.js             Ansichten Aufbau und Kartengenerator
   kompendium.js         Ansichten Fraktionen, Technologien, Karten
-  hub.js                Hub: Sessions, Fraktionswahl, Historie, Statistiken (Server oder lokal)
+  hub.js                Hub: Sessions, Fraktionswahl, Historie, Statistiken, Login, Profil, Admin, Verlauf (Server oder lokal)
   assets.js             Originalmaterial, Quellen, Bildvergrößerung
   assets/               lokale Originalausschnitte und SVG-Referenzhilfen
   data/de-namen.js      deutsche Anzeigenamen mit Herkunftskennzeichnung
