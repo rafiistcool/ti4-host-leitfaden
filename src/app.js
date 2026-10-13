@@ -43,6 +43,14 @@
     info: '<path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0"/><path d="M12 11v6M12 7.5v.5"/>',
     say: '<path d="M3 10v4h4l6 5V5L7 10z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>',
     back: '<path d="M15 5l-7 7 7 7"/>',
+    map: '<path d="M12 2.5l3.5 2v4L12 10.5 8.5 8.5v-4z"/><path d="M7 11.5l3.5 2v4L7 19.5l-3.5-2v-4z"/><path d="M17 11.5l3.5 2v4l-3.5 2-3.5-2v-4z"/>',
+    faction: '<path d="M12 3l7 3v5c0 5-3.2 8.4-7 10-3.8-1.6-7-5-7-10V6z"/><path d="M12 8v8M8.5 12h7"/>',
+    tech: '<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8" transform="rotate(120 12 12)"/>',
+    cards: '<rect x="3.5" y="6.5" width="12" height="15" rx="2"/><path d="M8 3.5h10.5a2 2 0 0 1 2 2V18"/>',
+    dice: '<rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r=".6"/><circle cx="15" cy="9" r=".6"/><circle cx="12" cy="12" r=".6"/><circle cx="9" cy="15" r=".6"/><circle cx="15" cy="15" r=".6"/>',
+    copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
+    ext: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>',
+    fwd: '<path d="M9 5l7 7-7 7"/>',
     reset: '<path d="M4 4v6h6"/><path d="M5 15a8 8 0 1 0 2-8.5L4 10"/>'
   };
   function svg(name, size, color) {
@@ -50,12 +58,24 @@
       '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[name] + "</svg>";
   }
 
+  /* ---------- Erweiterungen (Aufbau, Kartengenerator, Kompendium) ---------- */
+  var EXT = D.ext || [];
+  D.UI = {
+    esc: esc, md: md, plain: plain, norm: norm, svg: svg, refChip: function (r) { return refChip(r); }, blocks: function (l) { return blocks(l); },
+    go: function (h) { go(h); }, load: load, save: save, topicById: topicById,
+    route: function () { return route; }, rerender: function () { render(false); }
+  };
+
   /* ---------- Routing über #anker ---------- */
   function parseHash() {
     var h = "";
     try { h = decodeURIComponent((location.hash || "").slice(1)); } catch (e) {}
     if (!h || h === "ablauf") return { v: "ablauf" };
     if (h === "kampf") return { v: "topic", id: "kampf", tab: "kampf" };
+    for (var x = 0; x < EXT.length; x++) {
+      var er = EXT[x].parse(h);
+      if (er) { er.v = "ext"; er.x = EXT[x]; return er; }
+    }
     if (h === "nachschlagen" || h === "regeln" || h === "suche" || h === "credits") return { v: h };
     if (h.indexOf("t-") === 0 && topicById[h.slice(2)]) return { v: "topic", id: h.slice(2) };
     if (h.indexOf("r-") === 0 && ruleById[h.slice(2)]) return { v: "regeln", focus: h.slice(2) };
@@ -184,17 +204,26 @@
     var h = "<h1>Nachschlagen</h1>" +
       '<p class="lead">Regeln während der Runde nachsehen. Der Ablauf bleibt an seiner Stelle stehen.</p>' +
       '<form class="search-form" data-form="hub-search" role="search"><label class="field" for="hub-q">' + svg("search", 20) +
-      '<span class="sr">Regel suchen</span><input id="hub-q" type="search" placeholder="Suchen, z. B. Rückzug, Sabotage, passen" autocomplete="off"></label></form>' +
+      '<span class="sr">Regel suchen</span><input id="hub-q" type="search" placeholder="Suchen, z. B. Rückzug, Sabotage, Hacan" autocomplete="off"></label></form>' +
       '<p class="section-k">Themen</p><div class="topics">' +
       TOPICS.map(function (t) {
-        return '<a class="topic" href="#t-' + t.id + '"><span class="ic">' + svg(t.icon, 22) + '</span><span><span class="nm">' + esc(t.name) + '</span><span class="ds">' + esc(t.desc) + "</span></span></a>";
+        return '<a class="topic" href="' + (t.id === "aufbau" ? "#aufbau" : "#t-" + t.id) + '"><span class="ic">' + svg(t.icon, 22) + '</span><span><span class="nm">' + esc(t.name) + '</span><span class="ds">' + esc(t.desc) + "</span></span></a>";
       }).join("") + "</div>" +
       '<a class="topic big" href="#regeln"><span class="ic">' + svg("az", 22) + '</span><span><span class="nm">Regelreferenz A–Z</span><span class="ds">Alle ' + D.rules.length +
       " Einträge der Living Rules Reference in eigenen Worten, mit den Nummern des offiziellen Regelhefts.</span></span></a>" +
+      '<p class="section-k">Kompendium</p><div class="topics">' +
+      hubLink("#fraktionen", "faction", "Fraktionen", "Alle " + (D.factions || []).length + " Fraktionen mit Fähigkeiten, Einheiten, Anführern und Heimat-System.") +
+      hubLink("#technologien", "tech", "Technologien", "Alle allgemeinen Technologien nach Farbe, dazu die Fraktionstechnologien.") +
+      hubLink("#karten", "cards", "Karten", "Aktionskarten, Agenden, Aufträge, Relikte und Erkundungskarten.") +
+      hubLink("#generator", "map", "Kartengenerator", "Zufällige, ausgewogene Galaxie für 3 bis 8 Spieler.") + "</div>" +
       '<p class="section-k">Partie</p><div class="list-links">' +
       '<button type="button" data-act="new-game" class="' + (resetArmed ? "danger" : "") + '">' + svg("reset", 20) + "<span>" + (resetArmed ? "Wirklich? Noch einmal tippen zum Zurücksetzen" : "Neue Partie starten (Runde 1, alles zurücksetzen)") + "</span></button>" +
       '<a href="#credits">' + svg("info", 20) + '<span>Über diese Seite und Credits</span><span class="arr">›</span></a></div>';
     return h;
+  }
+
+  function hubLink(href, icon, name, desc) {
+    return '<a class="topic" href="' + href + '"><span class="ic">' + svg(icon, 22) + '</span><span><span class="nm">' + esc(name) + '</span><span class="ds">' + esc(desc) + "</span></span></a>";
   }
 
   function viewTopic(id) {
@@ -275,6 +304,7 @@
     D.rules.forEach(function (r) {
       INDEX.push({ ty: "Regel Nr. " + r.nr, t: r.t, txt: [r.en, r.k || "", collect(r.x, []).join(" ")].join(" "), href: "#r-" + r.id, w: 3 });
     });
+    EXT.forEach(function (x) { if (x.index) x.index(function (e) { INDEX.push(e); }, collect); });
     INDEX.forEach(function (e) { e.nt = norm(e.t); e.nx = norm(e.txt); });
   }
   function snippet(text, words) {
@@ -314,7 +344,7 @@
     var r = searchResults(searchQ);
     if (!r) {
       box.innerHTML = '<p class="section-k">Häufig gesucht</p><div class="chips">' +
-        ["Rückzug", "Sabotage", "passen", "Transaktion", "Flottenpool", "Erkundung", "Hütermarker", "Weltraumkanone", "Nachtrag", "Held"].map(function (w) {
+        ["Rückzug", "Sabotage", "passen", "Transaktion", "Flottenpool", "Erkundung", "Hütermarker", "Weltraumkanone", "Nachtrag", "Held", "Wurmloch", "Flaggschiff"].map(function (w) {
           return '<button type="button" class="chip" data-act="suggest" data-q="' + esc(w) + '">' + esc(w) + "</button>";
         }).join("") + "</div>";
       return;
@@ -328,7 +358,7 @@
   }
   function viewSuche() {
     return "<h1>Suche</h1>" +
-      '<label class="field" for="q">' + svg("search", 20) + '<span class="sr">Suchbegriff</span><input id="q" type="search" placeholder="Ablauf, Themen und alle Regeln durchsuchen" autocomplete="off" value="' + esc(searchQ) + '"></label>' +
+      '<label class="field" for="q">' + svg("search", 20) + '<span class="sr">Suchbegriff</span><input id="q" type="search" placeholder="Regeln, Fraktionen, Karten durchsuchen" autocomplete="off" value="' + esc(searchQ) + '"></label>' +
       '<div class="results" id="results"></div>';
   }
 
@@ -346,7 +376,11 @@
       '<div class="card credits"><h3>Quellen</h3><ul>' +
       "<li>Living Rules Reference 2.0 (deutsch, Stand 25.01.2021) inklusive Errata und FAQ. Die „Nr.“ in der Regelreferenz verweist auf deren Absätze.</li>" +
       '<li>Offizielle Regeln und Errata als Download auf den Produktseiten von <a href="https://www.fantasyflightgames.com/en/products/twilight-imperium-fourth-edition/" target="_blank" rel="noopener">Fantasy Flight Games</a> und <a href="https://www.asmodee.de" target="_blank" rel="noopener">Asmodee</a>.</li>' +
-      '<li>Zum Gegenlesen: <a href="https://www.tirules.com" target="_blank" rel="noopener">tirules.com</a> (englische Rules Reference mit Klarstellungen) und das <a href="https://twilight-imperium.fandom.com" target="_blank" rel="noopener">Twilight Imperium Wiki</a>.</li></ul></div>' +
+      '<li>Zum Gegenlesen: <a href="https://www.tirules.com" target="_blank" rel="noopener">tirules.com</a> (englische Rules Reference mit Klarstellungen) und das <a href="https://twilight-imperium.fandom.com" target="_blank" rel="noopener">Twilight Imperium Wiki</a>.</li>' +
+      '<li>Werte von Systemtafeln, Fraktionen und Karten: Daten des Discord-Bots <a href="https://github.com/AsyncTI4/TI4_map_generator_bot" target="_blank" rel="noopener">AsyncTI4</a> (gemeinfrei, Unlicense) und des Kartengenerators <a href="https://github.com/KeeganW/ti4" target="_blank" rel="noopener">KeeganW/ti4</a>, gegeneinander abgeglichen. Positionen der Spielplan-Zusammensetzungen nach Seite 6 der Living Rules Reference.</li></ul></div>' +
+      '<div class="card credits"><h3>Bilder und Kartentexte</h3>' +
+      "<p>Die Systemtafeln im Aufbau und im Kartengenerator sind selbst gezeichnet: Planeten, Werte, Wurmlöcher und Anomalien kommen aus den Spieldaten, die Grafik ist ein eigener, schlichter Stil. Originalgrafiken, Kartenbilder und Scans von Fantasy Flight Games sind bewusst nicht eingebunden.</p>" +
+      "<p>Karten-, Fraktions- und Technologietexte sind sinngemäße Zusammenfassungen. Deutsche Namen stehen da, wo die deutsche Living Rules Reference sie verwendet, sonst der englische Originalname. Der Kartengenerator ist ein Hilfsmittel, kein offizielles Werkzeug.</p></div>" +
       '<div class="card credits"><h3>Gemacht von</h3>' +
       '<p>Zusammengestellt von Rafael Till (<a href="https://github.com/rafiistcool" target="_blank" rel="noopener">@rafiistcool</a>) mit Unterstützung von Claude (Anthropic).</p>' +
       "<p>Schriften: Saira Condensed, Source Sans 3 und IBM Plex Mono (SIL Open Font License). In der installierten App werden sie mitgeliefert, damit alles offline funktioniert.</p>" +
@@ -356,7 +390,7 @@
   /* ---------- Rahmen: Kopf, Seitenleiste, Dock ---------- */
   function currentTab() {
     if (route.v === "ablauf") return "ablauf";
-    if (route.tab === "kampf") return "kampf";
+    if (route.tab) return route.tab;
     if (route.v === "suche") return "suche";
     return "nachschlagen";
   }
@@ -381,7 +415,7 @@
           return '<button type="button" class="' + (j < st.s ? "done" : (j === st.s ? "cur" : "")) + '" data-act="step" data-p="' + st.p + '" data-s="' + j + '" aria-label="Schritt ' + (j + 1) + ": " + esc(s.t) + '"><span></span></button>';
         }).join("") + "</div></div>";
     } else {
-      var title = route.tab === "kampf" ? "Im Kampf" : ({ topic: "Nachschlagen", nachschlagen: "Nachschlagen", regeln: "Nachschlagen", suche: "Suche", credits: "Nachschlagen" })[route.v];
+      var title = route.title || (route.tab === "kampf" ? "Im Kampf" : null) || ({ topic: "Nachschlagen", nachschlagen: "Nachschlagen", regeln: "Nachschlagen", suche: "Suche", credits: "Nachschlagen" })[route.v];
       el.innerHTML = '<div class="top-row"><span class="top-title">' + esc(title) + '</span><span class="spacer"></span>' +
         '<a class="pill" href="#ablauf">‹ Ablauf <b>' + esc(phaseShort()) + "</b></a></div>";
     }
@@ -406,8 +440,13 @@
       '<nav class="rail-nav" aria-label="Bereiche">' +
       railLink("#ablauf", "ablauf", "Ablauf", tab === "ablauf") +
       railLink("#kampf", "kampf", "Kampf", tab === "kampf") +
-      railLink("#nachschlagen", "book", "Nachschlagen", tab === "nachschlagen" && route.v !== "regeln" && route.v !== "credits") +
+      railLink("#aufbau", "aufbau", "Aufbau", route.rail === "aufbau") +
+      railLink("#generator", "map", "Kartengenerator", route.rail === "generator") +
+      railLink("#nachschlagen", "book", "Nachschlagen", tab === "nachschlagen" && !route.rail && route.v !== "regeln" && route.v !== "credits") +
       railLink("#regeln", "az", "Regeln A–Z", route.v === "regeln") +
+      railLink("#fraktionen", "faction", "Fraktionen", route.rail === "fraktionen") +
+      railLink("#technologien", "tech", "Technologien", route.rail === "technologien") +
+      railLink("#karten", "cards", "Karten", route.rail === "karten") +
       railLink("#suche", "search", "Suche", tab === "suche") +
       railLink("#credits", "info", "Über und Credits", route.v === "credits") + "</nav>";
   }
@@ -429,9 +468,9 @@
 
   function renderTabbar() {
     var tab = currentTab();
-    var items = [["#ablauf", "ablauf", "Ablauf"], ["#kampf", "kampf", "Kampf"], ["#nachschlagen", "book", "Nachschlagen"], ["#suche", "search", "Suche"]];
+    var items = [["#ablauf", "ablauf", "Ablauf", "ablauf"], ["#kampf", "kampf", "Kampf", "kampf"], ["#aufbau", "aufbau", "Aufbau", "aufbau"], ["#nachschlagen", "book", "Nachschlagen", "nachschlagen"], ["#suche", "search", "Suche", "suche"]];
     document.getElementById("tabbar").innerHTML = items.map(function (it) {
-      return '<a href="' + it[0] + '"' + (tab === it[1] || (it[1] === "book" && tab === "nachschlagen") ? ' aria-current="page"' : "") + ">" + svg(it[1], 22) + "<span>" + it[2] + "</span></a>";
+      return '<a href="' + it[0] + '"' + (tab === it[3] ? ' aria-current="page"' : "") + ">" + svg(it[1], 22) + "<span>" + it[2] + "</span></a>";
     }).join("");
   }
 
@@ -443,15 +482,18 @@
     else if (route.v === "regeln") { v.innerHTML = viewRegeln(); applyRuleFilter(); }
     else if (route.v === "suche") { v.innerHTML = viewSuche(); renderResults(); }
     else if (route.v === "credits") v.innerHTML = viewCredits();
+    else if (route.v === "ext") v.innerHTML = route.x.render(route);
   }
 
   function render(scroll) {
     renderRail(); renderTop(); renderView(); renderDock(); renderTabbar();
     var topH = document.getElementById("top").offsetHeight;
     document.documentElement.style.setProperty("--top-h", topH + "px");
+    if (route.v === "ext" && route.x.after) route.x.after(route);
     if (scroll) {
-      if (route.v === "regeln" && route.focus) {
-        var el = document.getElementById("r-" + route.focus);
+      var fid = route.v === "regeln" && route.focus ? "r-" + route.focus : (route.v === "ext" && route.focusEl);
+      if (fid) {
+        var el = document.getElementById(fid);
         if (el) { var y = el.getBoundingClientRect().top + window.scrollY - topH - 60; window.scrollTo(0, Math.max(0, y)); return; }
       }
       window.scrollTo(0, 0);
@@ -464,6 +506,7 @@
     var t = ev.target.closest("[data-act]");
     if (!t) return;
     var a = t.getAttribute("data-act");
+    for (var x = 0; x < EXT.length; x++) if (EXT[x].click && EXT[x].click(a, t, ev)) return;
     if (a === "next") { goNext(); rerenderAblauf(); }
     else if (a === "prev") { goPrev(); rerenderAblauf(); }
     else if (a === "next-turn") { setPos(1, 0); rerenderAblauf(); }
@@ -496,6 +539,7 @@
     }
   });
   document.addEventListener("change", function (ev) {
+    for (var x = 0; x < EXT.length; x++) if (EXT[x].change && EXT[x].change(ev)) return;
     var id = ev.target.getAttribute && ev.target.getAttribute("data-chk");
     if (!id) return;
     if (ev.target.checked) checks[id] = true; else delete checks[id];
@@ -504,6 +548,7 @@
   document.addEventListener("input", function (ev) {
     if (ev.target.id === "q") { searchQ = ev.target.value; renderResults(); }
     if (ev.target.id === "rf") { ruleFilter = ev.target.value; applyRuleFilter(); }
+    for (var x = 0; x < EXT.length; x++) if (EXT[x].input && EXT[x].input(ev)) return;
   });
   document.addEventListener("submit", function (ev) {
     var f = ev.target.getAttribute("data-form");
@@ -515,6 +560,7 @@
     }
   });
   document.addEventListener("keydown", function (ev) {
+    if ((ev.key === "Enter" || ev.key === " ") && ev.target.getAttribute && ev.target.getAttribute("data-act") === "hex") { ev.preventDefault(); ev.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); return; }
     if (route.v !== "ablauf" || ev.altKey || ev.ctrlKey || ev.metaKey) return;
     var tag = (ev.target.tagName || "").toLowerCase();
     if (tag === "input" || tag === "textarea") return;

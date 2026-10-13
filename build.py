@@ -14,7 +14,9 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent
 SRC = ROOT / "src"
-DATA = ["data/ablauf.js", "data/themen.js", "data/regeln-1.js", "data/regeln-2.js"]
+DATA = ["data/ablauf.js", "data/themen.js", "data/regeln-1.js", "data/regeln-2.js",
+        "data/tiles.js", "data/layouts.js", "data/fraktionen.js", "data/karten-1.js", "data/karten-2.js",
+        "map.js", "aufbau.js", "kompendium.js"]
 
 GOOGLE_FONTS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'

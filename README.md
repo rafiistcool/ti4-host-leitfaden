@@ -4,8 +4,11 @@ Host-Begleiter für **Twilight Imperium: Vierte Edition** mit **Prophezeiung der
 
 - **Ablauf**: führt Schritt für Schritt durch Strategie-, Aktions-, Status- und Agendaphase, mit Ansagen für den Tisch, Warnhinweisen und passenden Regelverweisen. Runde und Hütermarker werden mitgezählt, die Agendaphase schaltet sich erst nach dem Hütermarker frei.
 - **Kampf**: Checklisten für Raumkampf, Einmarsch und Bodenkampf zum Abhaken.
+- **Aufbau**: Spielplan-Schema für 3 bis 8 Spieler mit allen offiziellen Varianten (Hyperrouten, große Galaxie, Alternativen), Tafeln pro Spieler, Legereihenfolge und der komplette Aufbau als Checkliste.
+- **Kartengenerator**: würfelt eine Galaxie mit gezeichneten Systemtafeln, hält Anomalien und gleiche Wurmlöcher auseinander und gleicht die Plätze aus. Dazu Ausgleichstabelle, Liste der Tafeln zum Heraussuchen, Kartencode und teilbarer Link (gleiche Kartennummer ergibt dieselbe Karte).
+- **Kompendium**: alle 25 Fraktionen (Grundspiel, PoK, Council Keleres) mit Fähigkeiten, Einheiten, Technologien, Anführern und Vertragskarte, alle Technologien sowie Aktionskarten, Agenden, Aufträge, Relikte und Erkundungskarten, filterbar.
 - **Nachschlagen**: Themen (Taktikaktion, „Wann darf ich…?“, Handel, Strategiekarten, Limits und Einheitenwerte, PoK-Neuerungen, Aufbau) und eine **Regelreferenz A–Z** mit allen 101 Einträgen der Living Rules Reference 2.0, in eigenen Worten und mit den Absatznummern des offiziellen deutschen Regelhefts.
-- **Suche** über Ablauf, Themen und Regeln. Umlaute gehen auch als ae/oe/ue, englische Begriffe werden mitgefunden.
+- **Suche** über Ablauf, Themen, Regeln, Fraktionen und Karten. Umlaute gehen auch als ae/oe/ue, englische Begriffe werden mitgefunden.
 - **Offline**: Nach dem ersten Öffnen funktioniert alles ohne Netz, Schriften und Icons werden mitgeliefert.
 
 Fortschritt und Häkchen werden nur lokal im Browser gespeichert (`localStorage`).
@@ -66,10 +69,18 @@ src/
   index.template.html   Gerüst
   style.css             Gestaltung (hell/dunkel)
   app.js                Navigation, Ablauf-Logik, Suche
+  map.js                Spielplan-Geometrie, gezeichnete Systemtafeln, Generator
+  aufbau.js             Ansichten Aufbau und Kartengenerator
+  kompendium.js         Ansichten Fraktionen, Technologien, Karten
   data/ablauf.js        Schritte der vier Phasen
   data/themen.js        Themen-Seiten fürs Nachschlagen
   data/regeln-1.js      Regelreferenz Nr. 1–50
   data/regeln-2.js      Regelreferenz Nr. 51–101
+  data/tiles.js         Systemtafeln 1–91 mit Planeten, Anomalien, Wurmlöchern, Hyperrouten
+  data/layouts.js       offizielle Spielplan-Zusammensetzungen
+  data/fraktionen.js    Fraktionen
+  data/karten-1.js      Technologien, Aufträge, Relikte, Erkundung
+  data/karten-2.js      Aktionskarten, Agenden
   pwa/                  Manifest und Service Worker
   icons/                App-Icons (SVG-Quelle und PNG)
   fonts/                Schriften als woff2 mit Lizenz
@@ -91,5 +102,7 @@ Nach einer Änderung in `src/` bekommt der Service Worker automatisch eine neue 
 Inoffizielles Fan-Hilfsmittel. Twilight Imperium und Prophezeiung der Könige sind Marken von Fantasy Flight Games, die deutsche Ausgabe erscheint bei Asmodee. Kein Zusammenhang mit oder Unterstützung durch Fantasy Flight Games oder Asmodee.
 
 Alle Regeltexte sind eigene Zusammenfassungen auf Grundlage der Living Rules Reference 2.0 (deutsch, 25.01.2021) inklusive Errata und FAQ. Bei Abweichungen gelten Kartentext und offizielle Regeln.
+
+Werte von Systemtafeln, Fraktionen und Karten stammen aus den Daten von [AsyncTI4](https://github.com/AsyncTI4/TI4_map_generator_bot) (Unlicense) und [KeeganW/ti4](https://github.com/KeeganW/ti4), gegeneinander abgeglichen. Kartentexte sind sinngemäß zusammengefasst, deutsche Namen nur dort, wo die deutsche LRR sie belegt. Die Systemtafeln sind selbst gezeichnet, Originalgrafiken von Fantasy Flight Games sind nicht enthalten.
 
 Zusammengestellt von Rafael Till ([@rafiistcool](https://github.com/rafiistcool)) mit Unterstützung von Claude (Anthropic). Schriften: Saira Condensed, Source Sans 3, IBM Plex Mono, SIL Open Font License 1.1 (siehe `src/fonts/LICENSE-FONTS.txt`).
