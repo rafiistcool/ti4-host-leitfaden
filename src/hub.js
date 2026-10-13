@@ -1,5 +1,5 @@
 /* Hub für die Spielrunde: Spieler, geplante Sessions mit Fraktionswahl, Historie mit Siegpunkten, Statistiken.
-   Daten liegen auf dem Server (Spring-Boot-API unter TI4.hubApi). Ist keiner erreichbar, speichert der Hub nur lokal im Browser. */
+   Daten liegen auf dem Server (Rust-API aus server/, Adresse in TI4.hubApi). Ist keiner erreichbar, speichert der Hub nur lokal im Browser. */
 (function () {
   "use strict";
   var D = window.TI4;
@@ -122,7 +122,7 @@
       if (p.faction) { if (fs[p.faction]) Local.fail("Eine Fraktion kann pro Spiel nur einmal gewählt werden."); fs[p.faction] = 1; }
     });
   }
-  // Wie GameService.withPlacements: fehlt eine Platzierung, entscheiden die Siegpunkte (Gleichstand: Listenreihenfolge).
+  // Wie with_placements in server/src/lib.rs: fehlt eine Platzierung, entscheiden die Siegpunkte (Gleichstand: Listenreihenfolge).
   function withPlacements(list) {
     if (list.length && list.every(function (p) { return p.placement != null; })) return list;
     var ranked = list.map(function (p, i) { return { p: p, i: i }; })

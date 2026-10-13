@@ -19,7 +19,7 @@ jobs:
           - name: Seite (nginx)
             context: .
             image: ghcr.io/${{ github.repository }}
-          - name: Hub-API (Spring Boot)
+          - name: Hub-API (Rust)
             context: ./server
             image: ghcr.io/${{ github.repository }}-api
     name: ${{ matrix.name }}

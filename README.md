@@ -13,11 +13,11 @@ Host-Begleiter für **Twilight Imperium: Vierte Edition** mit **Prophezeiung der
 - **Hub für eure Spielrunde**: Countdown zur nächsten Session, wer dabei ist und welche Fraktion gewählt hat (Fraktionsraster zum Antippen), Historie aller Partien mit Siegpunkten, Platzierungen und Sieger, Spieler- und Fraktionsstatistiken. Ohne Accounts: Jeder kann Spieler anlegen, Sessions planen und Ergebnisse eintragen.
 - **Offline**: Nach dem ersten Öffnen funktioniert alles ohne Netz, Schriften und Icons werden mitgeliefert.
 
-Fortschritt und Häkchen werden nur lokal im Browser gespeichert (`localStorage`). Die Hub-Daten liegen dagegen auf einem kleinen Server (Spring Boot, Ordner `server/`), damit alle denselben Stand sehen. Läuft keiner (z. B. bei GitHub Pages), speichert der Hub nur im eigenen Browser und sagt das auch.
+Fortschritt und Häkchen werden nur lokal im Browser gespeichert (`localStorage`). Die Hub-Daten liegen dagegen auf einem kleinen Server (Rust, Ordner `server/`), damit alle denselben Stand sehen. Läuft keiner (z. B. bei GitHub Pages), speichert der Hub nur im eigenen Browser und sagt das auch.
 
-## Hub-Server (Spring Boot)
+## Hub-Server (Rust)
 
-`server/` ist eine Spring-Boot-4-Anwendung (Java 21) mit REST-API unter `/api`, Spring Data JPA, Flyway und einer H2-Datei-Datenbank. Kein Login: Wer die Seite öffnen kann, kann auch bearbeiten.
+`server/` ist ein schlanker Rust-Server (axum, SQLite über rusqlite) mit REST-API unter `/api`: ein Binary von gut 3 MB, die Daten liegen in einer einzigen Datei `ti4hub.db`. Kein Login: Wer die Seite öffnen kann, kann auch bearbeiten.
 
 | Methode | Pfad | Zweck |
 |---|---|---|
@@ -25,17 +25,17 @@ Fortschritt und Häkchen werden nur lokal im Browser gespeichert (`localStorage`
 | `PUT/DELETE` | `/api/players/{id}` | umbenennen, löschen (nur ohne eingetragene Spiele) |
 | `GET/POST` | `/api/games` | alle Sessions (neueste zuerst), anlegen |
 | `GET/PUT/DELETE` | `/api/games/{id}` | eine Session lesen, ändern, löschen |
-| `GET` | `/api/actuator/health` | Healthcheck |
+| `GET` | `/api/health` | Healthcheck |
 
 Eine Session hat Termin, Ort, Status (`PLANNED`/`FINISHED`), Siegpunkte zum Sieg und Teilnehmer mit Fraktion, Siegpunkten und Platz. Fehlt bei einem gespielten Spiel ein Platz, ergibt sich die Reihenfolge aus den Siegpunkten. Gleichzeitige Änderungen fängt optimistisches Sperren ab (`version`, Antwort 409). Fehler kommen als Problem Details mit deutschem `detail`.
 
 ```bash
 cd server
-mvn spring-boot:run          # http://localhost:8080/api/players, Daten in server/data/
-mvn verify                   # Tests
+cargo run                    # http://localhost:8080/api/players, Daten in server/data/
+cargo test                   # Tests
 ```
 
-Konfiguration über Umgebungsvariablen: `TI4_DATA_DIR` (Datenordner, im Container `/data`), `TI4_CORS_ALLOWED_ORIGINS` (nur wenn Seite und API unter verschiedenen Adressen laufen). Beim Bauen der Seite legt `HUB_API_URL` fest, wo die Seite die API sucht (Standard `api/`, also dieselbe Adresse; leer = nur lokal).
+Konfiguration über Umgebungsvariablen: `TI4_DATA_DIR` (Datenordner, im Container `/data`), `PORT` (Standard 8080), `TI4_CORS_ALLOWED_ORIGINS` (nur wenn Seite und API unter verschiedenen Adressen laufen). Beim Bauen der Seite legt `HUB_API_URL` fest, wo die Seite die API sucht (Standard `api/`, also dieselbe Adresse; leer = nur lokal).
 
 ## Hosten
 
@@ -69,7 +69,7 @@ Oder direkt aus dem Repo bauen, ohne Registry:
 docker compose up -d --build
 ```
 
-`docker-compose.yml` startet zwei Container: `ti4-host` (nginx mit der Seite) und `ti4-hub-api` (Spring Boot, Image `ghcr.io/rafiistcool/ti4-host-leitfaden-api`). Die Hub-Daten liegen im Volume `ti4-hub-data`; zum Sichern reicht eine Kopie davon.
+`docker-compose.yml` startet zwei Container: `ti4-host` (nginx mit der Seite) und `ti4-hub-api` (Rust, Image `ghcr.io/rafiistcool/ti4-host-leitfaden-api`). Die Hub-Daten liegen im Volume `ti4-hub-data`; zum Sichern reicht eine Kopie davon.
 
 Im Container liefert nginx die Seite aus und leitet `/api/` an den Hub-Server weiter (`docker/nginx.conf`). Für HTTPS den Container hinter einen Reverse Proxy hängen, zum Beispiel Caddy:
 
@@ -118,7 +118,7 @@ src/
   icons/                App-Icons (SVG-Quelle und PNG)
   fonts/                Schriften als woff2 mit Lizenz
 build.py                baut src/ zu site/ zusammen
-server/                 Hub-API (Spring Boot, Maven, eigenes Dockerfile)
+server/                 Hub-API (Rust, axum + SQLite, eigenes Dockerfile)
 Dockerfile, docker/     Image mit nginx
 .github/workflows/      GitHub Pages und Docker-Image
 ```

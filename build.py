@@ -21,7 +21,7 @@ DATA = ["data/ablauf.js", "data/themen.js", "data/regeln-1.js", "data/regeln-2.j
         "data/de-namen.js", "data/reference-assets.js", "data/original-assets.js", "data/english-sheets.js", "assets.js",
         "map.js", "aufbau.js", "kompendium.js", "hub.js"]
 
-# Adresse der Hub-API (Spring Boot, Ordner server/). Standard: gleiche Adresse wie die Seite, nginx leitet /api/ weiter.
+# Adresse der Hub-API (Rust, Ordner server/). Standard: gleiche Adresse wie die Seite, nginx leitet /api/ weiter.
 # Für GitHub Pages mit eigenem Server z. B. HUB_API_URL=https://ti4.example.de/api/ setzen; leer = nur lokal speichern.
 HUB_API_URL = os.environ.get("HUB_API_URL", "api/")
 
