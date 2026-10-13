@@ -74,6 +74,61 @@ Solange Pages nicht aktiviert ist, überspringt der Workflow das Deployment nur 
 
 ### Variante B: Docker
 
+#### Schnellstart
+
+1. Auf dem Server einen Ordner anlegen, z. B. `~/ti4`, und darin eine `docker-compose.yml` mit diesem Inhalt:
+
+   ```yaml
+   services:
+     # Die Seite (nginx). Leitet /api/ an den Hub-Server weiter.
+     ti4-host:
+       image: ghcr.io/rafiistcool/ti4-host-leitfaden:latest
+       container_name: ti4-host
+       restart: unless-stopped
+       ports:
+         - "8080:80"          # links den Port wählen, unter dem die Seite erreichbar sein soll
+       depends_on:
+         - ti4-hub-api
+
+     # Hub-Server (Rust): Spieler, Sessions, Accounts. Der Name muss ti4-hub-api bleiben.
+     ti4-hub-api:
+       image: ghcr.io/rafiistcool/ti4-host-leitfaden-api:latest
+       container_name: ti4-hub-api
+       restart: unless-stopped
+       volumes:
+         - ti4-hub-data:/data  # Datenbank und tägliche Sicherungen (/data/backup)
+       # environment:
+       #   TI4_BACKUP_KEEP: "14"        # wie viele tägliche Sicherungen bleiben, 0 = aus
+       #   TI4_COOKIE_SECURE: "true"    # nur nötig, wenn dein Proxy kein X-Forwarded-Proto schickt
+
+   volumes:
+     ti4-hub-data:
+   ```
+
+2. Starten:
+
+   ```bash
+   cd ~/ti4
+   docker compose up -d
+   ```
+
+   Die Seite läuft dann unter `http://<server>:8080`. Für den Login gehört davor ein Reverse Proxy mit HTTPS (siehe unten), sonst gehen Passwörter im Klartext übers Netz.
+
+3. **Ersten Account anlegen (Admin):** Solange es noch keinen Admin gibt, schreibt der Hub-Server beim Start einen Einrichtungscode ins Log:
+
+   ```bash
+   docker logs ti4-hub-api 2>&1 | grep "Code"
+   # Noch kein Admin. Im Hub auf „Anmelden“, dann „Registrieren“ mit diesem Code: k7mq2xh9rbpw
+   ```
+
+   Auf der Seite **Hub › Anmelden** öffnen. Dort steht „Admin einrichten“: den Code eintragen, deinen Spieler auswählen (oder „Ich bin neu…“ und Namen eingeben), Passwort festlegen. Fertig, du bist angemeldet und Admin. Der Code gilt danach nicht mehr. Ist das Log schon weg, einfach `docker restart ti4-hub-api`, solange es keinen Admin gibt, kommt derselbe Code wieder.
+
+4. **Freunde dazuholen:** Unter **Hub › Admin** einen Gruppencode setzen (oder „Zufällig“) und **Registrierung öffnen**. Den Code in eure Gruppe schicken. Jeder geht auf **Anmelden › Registrieren**, gibt den Code ein, wählt seinen Spieler und ein Passwort. Wenn alle drin sind: **Registrierung schließen**. Nachzügler und vergessene Passwörter laufen danach über **Einladen** bzw. **Passwort-Link** im Admin-Bereich.
+
+5. **Updates:** `docker compose pull && docker compose up -d`. Daten und Accounts bleiben im Volume.
+
+#### Mehr zu den Images
+
 Bei jedem Push auf `main` baut die Action **Docker-Image** ein Image für `amd64` und `arm64` und legt es in der GitHub Container Registry ab: `ghcr.io/rafiistcool/ti4-host-leitfaden:latest`.
 
 ```bash
@@ -92,7 +147,7 @@ docker compose up -d --build
 
 `docker-compose.yml` startet zwei Container: `ti4-host` (nginx mit der Seite) und `ti4-hub-api` (Rust, Image `ghcr.io/rafiistcool/ti4-host-leitfaden-api`). Die Hub-Daten liegen im Volume `ti4-hub-data`; zum Sichern reicht eine Kopie davon.
 
-Im Container liefert nginx die Seite aus und leitet `/api/` an den Hub-Server weiter (`docker/nginx.conf`). Für HTTPS den Container hinter einen Reverse Proxy hängen, zum Beispiel Caddy. Mit Login ist HTTPS Pflicht, sonst gehen Passwörter im Klartext übers Netz. Der Proxy sollte `X-Forwarded-Proto` setzen (Caddy, Traefik und Nginx Proxy Manager machen das von selbst), dann bekommt das Login-Cookie automatisch `Secure`:
+Im Container liefert nginx die Seite aus und leitet `/api/` an den Hub-Server weiter (`docker/nginx.conf`). Ist der Hub-Container gerade nicht erreichbar, antwortet nginx mit 503 und der Hub zeigt einen Hinweis, statt still nur lokal zu speichern. Für HTTPS den Container hinter einen Reverse Proxy hängen, zum Beispiel Caddy. Mit Login ist HTTPS Pflicht, sonst gehen Passwörter im Klartext übers Netz. Der Proxy sollte `X-Forwarded-Proto` setzen (Caddy, Traefik und Nginx Proxy Manager machen das von selbst), dann bekommt das Login-Cookie automatisch `Secure`:
 
 ```
 ti4.example.de {

@@ -37,7 +37,6 @@
     var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(s || "");
     return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : new Date(NaN);
   }
-  function isoLocal(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":00"; }
   var DF_LONG = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   var DF_SHORT = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "short", year: "numeric" });
   function dLong(s) { return DF_LONG.format(parseDate(s)); }
@@ -53,10 +52,13 @@
   /* ---------- Datenhaltung: Server oder lokal ---------- */
   var API = D.hubApi || "";
   var LKEY = "ti4.hub.v1";
+  var MKEY = "ti4.hub.mode";
   var mode = "loading"; // loading | server | local
+  var serverSeen = false; // einmal erfolgreich vom Server geladen: ab dann nie mehr lokal
   var data = { players: [], games: [] };
   var lastJson = "";
   var loadErr = "";
+  var STALE = "Jemand anderes hat dieses Spiel inzwischen geändert.";
   var me = null; // angemeldeter Benutzer { id, playerId, name, role } oder null
   var auth = { signupOpen: false, setupNeeded: false };
   function canEdit() { return mode === "local" || !!me; }
@@ -108,8 +110,11 @@
     saveGame: function (id, req) {
       var db = this.read(), g = id ? db.games.filter(function (x) { return x.id === id; })[0] : null;
       if (id && !g) this.fail("Spiel gibt es nicht.", 404);
-      if (g && req.version != null && req.version !== g.version) this.fail("Jemand anderes hat dieses Spiel gerade geändert. Die Seite lädt den neuen Stand, bitte nochmal speichern.", 409);
-      checkParticipants(req.participants);
+      if (g && req.version !== g.version) this.fail(STALE, 409);
+      checkGame(req);
+      req.participants.forEach(function (p) {
+        if (!db.players.some(function (x) { return x.id === p.playerId; })) Local.fail("Spieler " + p.playerId + " gibt es nicht.", 404);
+      });
       if (!g) { g = { id: db.seq++, version: -1 }; db.games.push(g); }
       Object.assign(g, {
         scheduledAt: req.scheduledAt, location: req.location || null, status: req.status, pointsToWin: req.pointsToWin || 10, notes: req.notes || null,
@@ -119,22 +124,40 @@
     },
     deleteGame: function (id) { var db = this.read(); db.games = db.games.filter(function (x) { return x.id !== id; }); this.write(db); }
   };
-  function checkParticipants(list) {
-    var ps = {}, fs = {};
+  // Dieselben Prüfungen wie validate() in server/src/lib.rs.
+  function checkGame(req) {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(req.scheduledAt || "")) Local.fail("Bitte Datum und Uhrzeit angeben.");
+    if (req.status !== "PLANNED" && req.status !== "FINISHED") Local.fail("Bitte einen Status angeben.");
+    var ptw = req.pointsToWin == null ? 10 : req.pointsToWin;
+    if (ptw < 4 || ptw > 20) Local.fail("Zwischen 4 und 20 Siegpunkten zum Sieg.");
+    if ((req.location || "").length > 80) Local.fail("Der Ort darf höchstens 80 Zeichen haben.");
+    if ((req.notes || "").length > 2000) Local.fail("Die Notiz darf höchstens 2000 Zeichen haben.");
+    var list = req.participants || [], n = list.length, ps = {}, fs = {}, pl = {};
+    if (n > 8) Local.fail("Höchstens 8 Spieler pro Spiel.");
     list.forEach(function (p) {
+      if (p.playerId == null) Local.fail("Jeder Platz braucht einen Spieler.");
       if (ps[p.playerId]) Local.fail("Ein Spieler ist doppelt eingetragen.");
       ps[p.playerId] = 1;
       if (p.faction) { if (fs[p.faction]) Local.fail("Eine Fraktion kann pro Spiel nur einmal gewählt werden."); fs[p.faction] = 1; }
+      if (p.victoryPoints != null && (p.victoryPoints < 0 || p.victoryPoints > 30)) Local.fail("Siegpunkte zwischen 0 und 30, bitte prüfen.");
+      if (p.placement != null) {
+        if (p.placement < 1 || p.placement > n) Local.fail("Platz " + p.placement + " gibt es bei " + n + " Spielern nicht.");
+        if (pl[p.placement]) Local.fail("Platz " + p.placement + " ist doppelt vergeben.");
+        pl[p.placement] = 1;
+      }
     });
   }
-  // Wie with_placements in server/src/lib.rs: fehlt eine Platzierung, entscheiden die Siegpunkte (Gleichstand: Listenreihenfolge).
+  // Wie with_placements in server/src/lib.rs: Wer Siegpunkte, aber keinen Platz hat, bekommt der Reihe nach
+  // (mehr Punkte zuerst, Gleichstand: Listenreihenfolge) die freien Plätze. Eingetragene Plätze bleiben.
   function withPlacements(list) {
-    if (list.length && list.every(function (p) { return p.placement != null; })) return list;
-    var ranked = list.map(function (p, i) { return { p: p, i: i }; })
-      .sort(function (a, b) { return ((b.p.victoryPoints || 0) - (a.p.victoryPoints || 0)) || (a.i - b.i); });
-    return list.map(function (p) {
-      var c = Object.assign({}, p); c.placement = ranked.findIndex(function (r) { return r.p === p; }) + 1; return c;
-    });
+    var taken = {}, next = 1;
+    list.forEach(function (p) { if (p.placement != null) taken[p.placement] = 1; });
+    var out = list.map(function (p) { return Object.assign({}, p); });
+    out.map(function (p, i) { return i; })
+      .filter(function (i) { return out[i].placement == null && out[i].victoryPoints != null; })
+      .sort(function (a, b) { return (out[b].victoryPoints - out[a].victoryPoints) || (a - b); })
+      .forEach(function (i) { while (taken[next]) next++; out[i].placement = next++; });
+    return out;
   }
 
   var Store = {
@@ -142,7 +165,8 @@
       if (!API) mode = "local";
       if (mode === "local") return Promise.resolve({ players: Local.players(), games: Local.games() });
       return Promise.all([http("GET", "players"), http("GET", "games"), http("GET", "auth/me")]).then(function (r) {
-        mode = "server"; return { players: r[0], games: r[1], me: r[2] };
+        mode = "server"; serverSeen = true; U().save(MKEY, "server");
+        return { players: r[0], games: r[1], me: r[2] };
       });
     },
     call: function (serverFn, localFn) {
@@ -158,19 +182,28 @@
     deleteGame: function (id) { return this.call(function () { return http("DELETE", "games/" + id); }, function () { return Local.deleteGame(id); }); }
   };
 
+  // Antworten können sich überholen (Abfrage alle 20 s, Neuladen nach dem Speichern): nur die jüngste zählt.
+  var reqSeq = 0, appliedSeq = 0;
   function refresh(force) {
+    var my = ++reqSeq;
     return Store.load().then(function (d) {
-      loadErr = "";
+      if (my < appliedSeq) return false;
+      appliedSeq = my; loadErr = "";
       var j = JSON.stringify(d);
       if (j === lastJson && !force) return false;
       lastJson = j; data = { players: d.players, games: d.games };
       if (d.me) { me = d.me.user || null; auth = { signupOpen: !!d.me.signupOpen, setupNeeded: !!d.me.setupNeeded }; }
       return true;
     }, function (e) {
-      // Keine API vorhanden (GitHub Pages, Webserver ohne Backend): lokal im Browser arbeiten.
-      if (mode !== "server" && e.status === 0) { mode = "local"; return refresh(true); }
+      if (!serverSeen) {
+        // Keine API vorhanden (GitHub Pages, Webserver ohne Backend): lokal im Browser arbeiten.
+        if (e.status === 0) { mode = "local"; U().save(MKEY, "local"); return refresh(true); }
+        // Offline gestartet: Hat dieses Gerät bisher lokal gespeichert, bleibt es dabei.
+        if (e.status === -1 && U().load(MKEY, "") === "local") { mode = "local"; return refresh(true); }
+      }
       // API vorhanden, aber gerade weg (Container startet neu, offline): nicht lokal weitermachen, sonst laufen die Daten auseinander.
-      mode = "server";
+      // Bevor der Server einmal geantwortet hat, darf eine spätere Antwort „keine API“ noch auf lokal umschalten (siehe oben).
+      if (mode === "loading") mode = "server";
       loadErr = e.status === -1 ? e.message : "Hub-Server gerade nicht erreichbar (" + (e.message || e.status) + "). Neuer Versuch in ein paar Sekunden.";
       return true;
     });
@@ -209,7 +242,7 @@
   function byPlacement(g) {
     return g.participants.slice().sort(function (a, b) { return (a.placement || 99) - (b.placement || 99); });
   }
-  function winner(g) { return byPlacement(g)[0]; }
+  function winner(g) { return g.participants.filter(function (p) { return p.placement === 1; })[0]; }
   function stats() {
     var ps = {};
     data.players.forEach(function (p) { ps[p.id] = { id: p.id, name: p.name, played: 0, wins: 0, place: 0, placeN: 0, vp: 0, vpN: 0, fac: {} }; });
@@ -410,17 +443,21 @@
   var delArmed = false;
   function draftFor(r) {
     var key = r.gid || r.page;
-    if (draft && draft.key === key) return draft;
-    delArmed = false;
     var g = r.gid ? data.games.filter(function (x) { return x.id === r.gid; })[0] : null;
     if (r.gid && !g) return null;
+    // Unberührter Entwurf folgt dem neuesten Stand; mit eigenen Änderungen bleibt er (Konflikt meldet das Speichern).
+    if (draft && draft.key === key && (draft.dirty || draft.conflict || !g || g.version === draft.version)) return draft;
+    delArmed = false;
+    // Neue Session: Ort und Runde vom letzten Spiel übernehmen, Fraktionen offen. Gespeichert wird erst mit „Speichern“.
+    var last = r.page === "new" ? data.games[0] : null;
     var at = g ? parseDate(g.scheduledAt) : (r.page === "new-past" ? (function () { var d = new Date(); d.setHours(18, 0, 0, 0); return d; })() : nextSaturday());
     draft = {
-      key: key, id: g ? g.id : null, version: g ? g.version : null,
+      key: key, id: g ? g.id : null, version: g ? g.version : null, dirty: false, conflict: false,
       date: at.getFullYear() + "-" + pad(at.getMonth() + 1) + "-" + pad(at.getDate()), time: pad(at.getHours()) + ":" + pad(at.getMinutes()),
-      location: g ? g.location || "" : "", status: g ? g.status : (r.page === "new-past" ? "FINISHED" : "PLANNED"),
-      pointsToWin: g ? g.pointsToWin : 10, notes: g ? g.notes || "" : "",
-      participants: g ? g.participants.map(function (p) { return Object.assign({}, p); }) : []
+      location: g ? g.location || "" : (last && last.location) || "", status: g ? g.status : (r.page === "new-past" ? "FINISHED" : "PLANNED"),
+      pointsToWin: g ? g.pointsToWin : (last ? last.pointsToWin : 10), notes: g ? g.notes || "" : "",
+      participants: g ? g.participants.map(function (p) { return Object.assign({}, p); }) :
+        (last ? last.participants.map(function (p) { return { playerId: p.playerId, faction: null, victoryPoints: null, placement: null }; }) : [])
     };
     return draft;
   }
@@ -435,6 +472,9 @@
     var free = data.players.filter(function (p) { return !d.participants.some(function (x) { return x.playerId === p.id; }); });
     var h = head("hub-sessions") + '<form class="hb-panel hb-form" data-form="hb-game" novalidate>' +
       panelHead(d.id ? "edit" : "plus", d.id ? "Session bearbeiten" : (fin ? "Gespieltes Spiel nachtragen" : "Neue Session planen")) +
+      (d.conflict ? '<div class="hb-conflict" role="alert"><p><b>Jemand anderes hat diese Session inzwischen geändert.</b> Deine Änderungen sind noch hier und nicht gespeichert.</p>' +
+        '<div class="hb-actions"><button type="button" class="hb-btn ghost" data-act="hb-reload">Neuen Stand laden (meine Änderungen verwerfen)</button>' +
+        '<button type="button" class="hb-btn danger" data-act="hb-force">Meine Version speichern (überschreibt)</button></div></div>' : "") +
       '<div class="hb-fields">' +
       '<label><span>Datum</span><input type="date" required data-hf="date" value="' + esc(d.date) + '"></label>' +
       '<label><span>Uhrzeit</span><input type="time" required data-hf="time" value="' + esc(d.time) + '"></label>' +
@@ -468,22 +508,25 @@
       "</div></form>";
     return root() + h + "</div>";
   }
+  var saving = false;
   function saveDraft() {
     var d = draft;
+    if (saving || d.conflict) return;
     if (!d.date || !/^\d{2}:\d{2}$/.test(d.time)) { toast("Bitte Datum und Uhrzeit angeben.", true); return; }
+    // Siegpunkte und Plätze gehen immer mit: Wer versehentlich auf „Geplant“ zurückstellt, verliert nichts.
     var req = {
       scheduledAt: d.date + "T" + d.time + ":00", location: d.location.trim() || null, status: d.status, pointsToWin: d.pointsToWin,
       notes: d.notes.trim() || null, version: d.version,
       participants: d.participants.map(function (p) {
-        var fin = d.status === "FINISHED";
-        return { playerId: p.playerId, faction: p.faction || null, victoryPoints: fin ? p.victoryPoints : null, placement: fin ? p.placement : null };
+        return { playerId: p.playerId, faction: p.faction || null, victoryPoints: p.victoryPoints, placement: p.placement };
       })
     };
     var wasFin = d.status === "FINISHED";
-    act(Store.saveGame(d.id, req), "Gespeichert").then(function () { draft = null; U().go(wasFin ? "hub-sessions" : "hub"); }, function (e) {
-      // Entwurf behalten. Bei einem Konflikt zählt der neue Stand als gesehen, ein zweites Speichern geht dann durch.
-      var g = data.games.filter(function (x) { return x.id === d.id; })[0];
-      if (e.status === 409 && g) d.version = g.version;
+    saving = true;
+    act(Store.saveGame(d.id, req), "Gespeichert").then(function () { saving = false; draft = null; U().go(wasFin ? "hub-sessions" : "hub"); }, function (e) {
+      saving = false;
+      // Entwurf behalten. Bei einem Konflikt entscheidet die Person: neuen Stand laden oder bewusst überschreiben.
+      if (e.status === 409) { d.conflict = true; rerender(); }
     });
   }
 
@@ -723,17 +766,22 @@
 
   /* ---------- Ereignisse ---------- */
   function cur() { var r = U().route(); return r.x === EXT ? r : null; }
+  // Änderungen an der nächsten Session laufen nacheinander: Jede baut auf dem Stand nach der vorigen auf
+  // (act() lädt nach dem Speichern neu), sonst gäbe es bei schnellem Tippen falsche Konflikte.
+  // Kommt trotzdem ein Konflikt (jemand anderes war schneller), wird die Änderung einmal auf den neuen Stand angewandt.
+  var queue = Promise.resolve();
   function updateNext(mut) {
-    var g = nextGame(); if (!g) return;
-    var parts = g.participants.map(function (p) { return Object.assign({}, p); });
-    mut(parts);
-    act(Store.saveGame(g.id, toReq(g, parts))).catch(function () {});
-  }
-  function plan() {
-    var at = nextSaturday(), last = finished()[0] || planned().slice(-1)[0];
-    var req = { scheduledAt: isoLocal(at), location: last ? last.location : null, status: "PLANNED", pointsToWin: 10, notes: null,
-      participants: last ? last.participants.map(function (p) { return { playerId: p.playerId, faction: null, victoryPoints: null, placement: null }; }) : [] };
-    act(Store.saveGame(null, req), "Session angelegt").then(function (g) { U().go("hub-spiel-" + g.id); }, function () {});
+    function attempt(retry) {
+      var g = nextGame(); if (!g) return Promise.resolve();
+      var parts = g.participants.map(function (p) { return Object.assign({}, p); });
+      mut(parts);
+      return Store.saveGame(g.id, toReq(g, parts)).then(function () { return refresh(true).then(rerender); }, function (e) {
+        if (e.status === 409 && retry) return refresh(true).then(function () { return attempt(false); });
+        toast(e.message || "Das hat nicht geklappt.", true);
+        return refresh(true).then(rerender);
+      });
+    }
+    queue = queue.then(function () { return attempt(true); }).catch(function () {});
   }
 
   // Aktionen, die etwas ändern und darum einen Login brauchen.
@@ -742,7 +790,7 @@
     if (a.indexOf("hb-") !== 0) return false;
     var pid = +t.getAttribute("data-p"), i = +t.getAttribute("data-i"), aid = +t.getAttribute("data-a");
     if (WRITE[a] && !canEdit()) { toast("Zum Ändern bitte anmelden."); return true; }
-    if (a === "hb-plan") plan();
+    if (a === "hb-plan") U().go("hub-spiel-new");
     else if (a === "hb-logout") act(http("POST", "auth/logout"), "Abgemeldet").then(function () { me = null; U().go("hub"); }, function () {});
     else if (a === "hb-logout-all") act(http("POST", "me/logout-all"), "Überall abgemeldet").then(function () { me = null; U().go("hub"); }, function () {});
     else if (a === "hb-copy") copy(t.getAttribute("data-copy"));
@@ -778,6 +826,12 @@
       else { resetArmed = false; pickFor = null; updateNext(function (ps) { ps.forEach(function (p) { p.faction = null; }); }); }
     }
     else if (a === "hb-status") { syncDraft(); draft.status = t.getAttribute("data-v"); rerender(); }
+    else if (a === "hb-reload") { draft = null; rerender(); }
+    else if (a === "hb-force") {
+      var cur = data.games.filter(function (x) { return x.id === draft.id; })[0];
+      if (!cur) { draft = null; rerender(); return true; }
+      syncDraft(); draft.version = cur.version; draft.conflict = false; saveDraft();
+    }
     else if (a === "hb-ptw") { syncDraft(); draft.pointsToWin = +t.getAttribute("data-v"); rerender(); }
     else if (a === "hb-up") { syncDraft(); var x = draft.participants.splice(i, 1)[0]; draft.participants.splice(i - 1, 0, x); rerender(); }
     else if (a === "hb-rm") { syncDraft(); draft.participants.splice(i, 1); rerender(); }
@@ -803,6 +857,7 @@
   // Eingaben im Formular in den Entwurf übernehmen (vor jedem Neuaufbau).
   function syncDraft() {
     if (!draft) return;
+    draft.dirty = true;
     document.querySelectorAll("[data-hf]").forEach(function (el) { draft[el.getAttribute("data-hf")] = el.value; });
     document.querySelectorAll("[data-hp]").forEach(function (el) {
       var p = draft.participants[+el.getAttribute("data-i")], k = el.getAttribute("data-hp"); if (!p) return;
@@ -908,6 +963,8 @@
     });
   }
   setInterval(poll, 20000);
+  // Wer den Editor verlässt, verwirft den Entwurf; beim Zurückkommen gilt der aktuelle Stand.
+  window.addEventListener("hashchange", function () { if (!/^#hub-spiel-/.test(location.hash)) draft = null; });
   document.addEventListener("visibilitychange", function () { if (!document.hidden) poll(); });
 
   var EXT = {

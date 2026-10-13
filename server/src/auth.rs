@@ -66,17 +66,20 @@ const WINDOW: Duration = Duration::from_secs(15 * 60);
 impl AppState {
     /// Zu viele Fehlversuche in den letzten 15 Minuten?
     fn blocked(&self, key: &str, max: u32) -> bool {
-        let mut map = self.limiter.lock().unwrap();
+        let mut map = self.limiter.lock().unwrap_or_else(|e| e.into_inner());
         map.retain(|_, (since, _)| since.elapsed() < WINDOW);
         map.get(key).is_some_and(|(_, n)| *n >= max)
     }
     fn failed(&self, key: &str) {
-        let mut map = self.limiter.lock().unwrap();
+        let mut map = self.limiter.lock().unwrap_or_else(|e| e.into_inner());
         let e = map.entry(key.to_string()).or_insert((Instant::now(), 0));
         e.1 += 1;
     }
     fn reset(&self, key: &str) {
-        self.limiter.lock().unwrap().remove(key);
+        self.limiter
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(key);
     }
 }
 
@@ -193,7 +196,7 @@ fn admin_count(conn: &Connection) -> rusqlite::Result<i64> {
 
 /// Einrichtungscode für den ersten Admin. `None`, sobald es einen Admin gibt.
 pub fn setup_code(db: &Db) -> rusqlite::Result<Option<String>> {
-    let conn = db.lock().unwrap();
+    let conn = db.lock().unwrap_or_else(|e| e.into_inner());
     if admin_count(&conn)? > 0 {
         set_setting(&conn, "setup_code", None)?;
         return Ok(None);
@@ -297,7 +300,7 @@ impl FromRequestParts<AppState> for User {
     type Rejection = ApiError;
     async fn from_request_parts(parts: &mut Parts, st: &AppState) -> Result<Self, ApiError> {
         let token = session_token(&parts.headers).ok_or_else(unauthorized)?;
-        let conn = st.db.lock().unwrap();
+        let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
         session_user(&conn, &token)?.ok_or_else(unauthorized)
     }
 }
@@ -325,7 +328,7 @@ impl FromRequestParts<AppState> for MaybeUser {
         let Some(token) = session_token(&parts.headers) else {
             return Ok(MaybeUser(None));
         };
-        let conn = st.db.lock().unwrap();
+        let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
         Ok(MaybeUser(session_user(&conn, &token)?))
     }
 }
@@ -431,7 +434,7 @@ struct LoginRequest {
 }
 
 pub async fn me(State(st): State<AppState>, MaybeUser(user): MaybeUser) -> ApiResult<Json<Value>> {
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     let open = setting(&conn, "signup_open")?.as_deref() == Some("1")
         && setting(&conn, "signup_code")?.is_some();
     let setup = admin_count(&conn)? == 0;
@@ -456,7 +459,7 @@ pub async fn login(
         return Err(too_many());
     }
     let row: Option<(i64, String)> = {
-        let conn = st.db.lock().unwrap();
+        let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT a.id, a.password_hash FROM account a JOIN player p ON p.id = a.player_id WHERE lower(p.name) = lower(?1)",
             [&name],
@@ -475,13 +478,13 @@ pub async fn login(
         ));
     }
     st.reset(&nkey);
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     logged_in(&st, &headers, &conn, row.unwrap().0)
 }
 
 pub async fn logout(State(st): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     if let Some(t) = session_token(&headers) {
-        let conn = st.db.lock().unwrap();
+        let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute("DELETE FROM session WHERE token_hash = ?1", [sha256(&t)])?;
     }
     let mut res = StatusCode::NO_CONTENT.into_response();
@@ -518,7 +521,7 @@ pub async fn register(
     let hash = hash_password(&pw)?;
     let code = req.code.unwrap_or_default();
 
-    let mut conn = st.db.lock().unwrap();
+    let mut conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     let tx = conn.transaction()?;
     let role = if admin_count(&tx)? == 0 {
         setting(&tx, "setup_code")?
@@ -618,7 +621,7 @@ pub async fn invite_info(
     State(st): State<AppState>,
     UrlPath(token): UrlPath<String>,
 ) -> ApiResult<Json<Value>> {
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     let (player_id, name, has) = find_invite(&conn, &token)?.ok_or_else(bad_invite)?;
     Ok(Json(
         json!({ "playerId": player_id, "name": name, "hasAccount": has }),
@@ -644,7 +647,7 @@ pub async fn invite_accept(
     let pw = req.password.unwrap_or_default();
     check_password(&pw)?;
     let hash = hash_password(&pw)?;
-    let mut conn = st.db.lock().unwrap();
+    let mut conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     let tx = conn.transaction()?;
     let Some((player_id, _, has)) = find_invite(&tx, &token)? else {
         st.failed(&ip);
@@ -709,7 +712,7 @@ pub async fn change_password(
     let pw = req.password.unwrap_or_default();
     check_password(&pw)?;
     let hash = hash_password(&pw)?;
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     require_password(&conn, &user, &req.current.unwrap_or_default())?;
     conn.execute(
         "UPDATE account SET password_hash = ?1 WHERE id = ?2",
@@ -728,7 +731,7 @@ pub async fn logout_everywhere(
     headers: HeaderMap,
     user: User,
 ) -> ApiResult<Response> {
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute("DELETE FROM session WHERE account_id = ?1", [user.id])?;
     let mut res = StatusCode::NO_CONTENT.into_response();
     res.headers_mut()
@@ -760,7 +763,7 @@ pub async fn delete_me(
     body: Bytes,
 ) -> ApiResult<Response> {
     let req: PasswordOnly = parse(&body)?;
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     require_password(&conn, &user, &req.password.unwrap_or_default())?;
     guard_last_admin(&conn, user.id)?;
     conn.execute("DELETE FROM account WHERE id = ?1", [user.id])?;
@@ -787,7 +790,7 @@ fn settings_dto(conn: &Connection) -> rusqlite::Result<Value> {
 }
 
 pub async fn get_settings(State(st): State<AppState>, _: Admin) -> ApiResult<Json<Value>> {
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     Ok(Json(settings_dto(&conn)?))
 }
 
@@ -797,7 +800,7 @@ pub async fn put_settings(
     body: Bytes,
 ) -> ApiResult<Json<Value>> {
     let req: Settings = parse(&body)?;
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(code) = req.signup_code {
         let code = code.trim().to_string();
         let n = code.chars().count();
@@ -830,7 +833,7 @@ pub async fn list_accounts(
     State(st): State<AppState>,
     _: Admin,
 ) -> ApiResult<Json<Vec<AccountDto>>> {
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     let mut stmt = conn.prepare(
         "SELECT a.id, a.player_id, p.name, a.role, a.created_at, a.last_seen FROM account a
          JOIN player p ON p.id = a.player_id ORDER BY p.name COLLATE NOCASE",
@@ -865,7 +868,7 @@ pub async fn set_role(
         Some("member") => "member",
         _ => return Err(bad("Rolle ist admin oder member.")),
     };
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     if role == "member" {
         guard_last_admin(&conn, id)?;
     }
@@ -884,7 +887,7 @@ pub async fn delete_account(
     _: Admin,
     UrlPath(id): UrlPath<i64>,
 ) -> ApiResult<StatusCode> {
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     guard_last_admin(&conn, id)?;
     conn.execute("DELETE FROM account WHERE id = ?1", [id])?;
     Ok(StatusCode::NO_CONTENT)
@@ -905,7 +908,7 @@ pub async fn create_invite(
 ) -> ApiResult<Json<Value>> {
     let req: InviteRequest = parse(&body)?;
     let pid = req.player_id.ok_or_else(|| bad("Für welchen Spieler?"))?;
-    let conn = st.db.lock().unwrap();
+    let conn = st.db.lock().unwrap_or_else(|e| e.into_inner());
     let name: String = conn
         .query_row("SELECT name FROM player WHERE id = ?1", [pid], |r| r.get(0))
         .optional()?

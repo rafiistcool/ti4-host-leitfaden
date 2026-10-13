@@ -55,7 +55,7 @@ pub struct AuditDto {
 }
 
 pub async fn list(State(db): State<Db>, _: User) -> ApiResult<Json<Vec<AuditDto>>> {
-    let conn = db.lock().unwrap();
+    let conn = db.lock().unwrap_or_else(|e| e.into_inner());
     let mut stmt = conn.prepare(
         "SELECT id, at, actor, action, entity, entity_id, before_json, after_json, undone_at IS NOT NULL
          FROM audit ORDER BY id DESC LIMIT ?1",
@@ -106,7 +106,7 @@ pub async fn undo(
     Admin(admin): Admin,
     UrlPath(id): UrlPath<i64>,
 ) -> ApiResult<Json<Value>> {
-    let mut conn = db.lock().unwrap();
+    let mut conn = db.lock().unwrap_or_else(|e| e.into_inner());
     let tx = conn.transaction()?;
     type Row = (String, i64, Option<String>, Option<String>, bool);
     let row: Option<Row> = tx
@@ -156,7 +156,7 @@ pub fn backup(db: &Db, dir: &Path, keep: usize) -> std::io::Result<Option<PathBu
     let created = if file.exists() {
         None
     } else {
-        let conn = db.lock().unwrap();
+        let conn = db.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute("VACUUM INTO ?1", [file.to_string_lossy()])
             .map_err(std::io::Error::other)?;
         Some(file)

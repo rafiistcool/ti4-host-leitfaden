@@ -19,6 +19,10 @@ services:
     restart: unless-stopped
     volumes:
       - ti4-hub-data:/data
+    # Beim ersten Start steht der Code für den ersten Admin im Log: docker logs ti4-hub-api
+    # environment:
+    #   TI4_BACKUP_KEEP: "14"        # tägliche Sicherungen in /data/backup, 0 = aus
+    #   TI4_COOKIE_SECURE: "true"    # nur nötig, wenn der Proxy kein X-Forwarded-Proto schickt
 
 volumes:
   ti4-hub-data:
