@@ -1,0 +1,25 @@
+name: Release
+
+# Ein Tag wie v1.0.0 auf main erzeugt das GitHub-Release. Die Notizen stehen in docs/releases/<tag>.md,
+# fehlt die Datei, schreibt GitHub sie aus den Commits. Die Docker-Images zum Tag baut docker.yml.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: notes
+        run: |
+          f="docs/releases/${GITHUB_REF_NAME}.md"
+          if [ -f "$f" ]; then echo "path=$f" >> "$GITHUB_OUTPUT"; fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: ${{ steps.notes.outputs.path }}
+          generate_release_notes: ${{ steps.notes.outputs.path == '' }}
