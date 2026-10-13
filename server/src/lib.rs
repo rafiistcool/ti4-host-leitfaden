@@ -1,5 +1,9 @@
 //! Hub-API für den TI4 Host-Leitfaden: Spieler und Sessions mit Fraktionen, Siegpunkten und Platzierungen.
-//! Eine SQLite-Datei, kein Login. Fehler kommen als Problem Details (RFC 9457) mit deutschem `detail`.
+//! Eine SQLite-Datei. Lesen darf jeder, Ändern nur mit Login (siehe `auth`), jede Änderung landet im Verlauf (`history`).
+//! Fehler kommen als Problem Details (RFC 9457) mit deutschem `detail`.
+
+pub mod auth;
+pub mod history;
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -9,13 +13,15 @@ use axum::body::Bytes;
 use axum::extract::{Path as UrlPath, State};
 use axum::http::{HeaderValue, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use chrono::NaiveDateTime;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Value, json};
 use tower_http::cors::CorsLayer;
+
+use auth::{AppState, User};
 
 const SCHEMA: &str = "
 PRAGMA foreign_keys = ON;
@@ -45,6 +51,43 @@ CREATE TABLE IF NOT EXISTS participant (
     PRIMARY KEY (game_id, player_id)
 );
 CREATE INDEX IF NOT EXISTS idx_participant_player ON participant (player_id);
+CREATE TABLE IF NOT EXISTS account (
+    id            INTEGER PRIMARY KEY,
+    player_id     INTEGER NOT NULL UNIQUE REFERENCES player (id),
+    role          TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    last_seen     TEXT
+);
+CREATE TABLE IF NOT EXISTS session (
+    token_hash TEXT PRIMARY KEY,
+    account_id INTEGER NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+CREATE TABLE IF NOT EXISTS invite (
+    token_hash TEXT PRIMARY KEY,
+    player_id  INTEGER NOT NULL REFERENCES player (id) ON DELETE CASCADE,
+    created_by INTEGER REFERENCES account (id) ON DELETE SET NULL,
+    expires_at TEXT NOT NULL,
+    used_at    TEXT
+);
+CREATE TABLE IF NOT EXISTS setting (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS audit (
+    id          INTEGER PRIMARY KEY,
+    at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    account_id  INTEGER REFERENCES account (id) ON DELETE SET NULL,
+    actor       TEXT NOT NULL,
+    action      TEXT NOT NULL,
+    entity      TEXT NOT NULL,
+    entity_id   INTEGER NOT NULL,
+    before_json TEXT,
+    after_json  TEXT,
+    undone_at   TEXT
+);
 ";
 
 const STALE: &str = "Jemand anderes hat dieses Spiel inzwischen geändert.";
@@ -53,7 +96,7 @@ pub type Db = Arc<Mutex<Connection>>;
 
 /// Datenbankarbeit auf einem Blocking-Thread, damit SQLite-I/O keine Tokio-Worker blockiert.
 /// Ein Panic in einem früheren Request vergiftet den Mutex nicht dauerhaft.
-async fn run<T, F>(db: Db, f: F) -> ApiResult<T>
+pub(crate) async fn run<T, F>(db: Db, f: F) -> ApiResult<T>
 where
     T: Send + 'static,
     F: FnOnce(&mut Connection) -> ApiResult<T> + Send + 'static,
@@ -78,7 +121,9 @@ pub fn open(path: &str) -> rusqlite::Result<Db> {
     Ok(Arc::new(Mutex::new(conn)))
 }
 
-pub fn app(db: Db, cors_origins: &[String]) -> Router {
+/// `secure`: Cookie mit `Secure` erzwingen (`Some(true)`), verbieten (`Some(false)`) oder nach `X-Forwarded-Proto` (`None`).
+pub fn app(db: Db, cors_origins: &[String], secure: Option<bool>) -> Router {
+    let state = AppState::new(db, cors_origins, secure);
     let mut router = Router::new()
         .route(
             "/api/health",
@@ -94,6 +139,33 @@ pub fn app(db: Db, cors_origins: &[String]) -> Router {
             "/api/games/{id}",
             get(get_game).put(update_game).delete(delete_game),
         )
+        .route("/api/auth/me", get(auth::me))
+        .route("/api/auth/login", post(auth::login))
+        .route("/api/auth/logout", post(auth::logout))
+        .route("/api/auth/register", post(auth::register))
+        .route(
+            "/api/auth/invite/{token}",
+            get(auth::invite_info).post(auth::invite_accept),
+        )
+        .route("/api/me", delete(auth::delete_me))
+        .route("/api/me/password", put(auth::change_password))
+        .route("/api/me/logout-all", post(auth::logout_everywhere))
+        .route(
+            "/api/admin/settings",
+            get(auth::get_settings).put(auth::put_settings),
+        )
+        .route("/api/admin/accounts", get(auth::list_accounts))
+        .route(
+            "/api/admin/accounts/{id}",
+            put(auth::set_role).delete(auth::delete_account),
+        )
+        .route("/api/admin/invites", post(auth::create_invite))
+        .route("/api/audit", get(history::list))
+        .route("/api/audit/{id}/undo", post(history::undo))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            auth::same_site_only,
+        ))
         .fallback(|| async { not_found("Diesen API-Pfad gibt es nicht.") })
         .method_not_allowed_fallback(|| async {
             ApiError(
@@ -101,7 +173,7 @@ pub fn app(db: Db, cors_origins: &[String]) -> Router {
                 "Diese Methode gibt es hier nicht.".into(),
             )
         })
-        .with_state(db);
+        .with_state(state);
     // Nur nötig, wenn Seite und API unter verschiedenen Adressen laufen (z. B. GitHub Pages + eigener Server).
     let origins: Vec<HeaderValue> = cors_origins.iter().filter_map(|o| o.parse().ok()).collect();
     if !origins.is_empty() {
@@ -109,7 +181,8 @@ pub fn app(db: Db, cors_origins: &[String]) -> Router {
             CorsLayer::new()
                 .allow_origin(origins)
                 .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-                .allow_headers([header::CONTENT_TYPE]),
+                .allow_headers([header::CONTENT_TYPE])
+                .allow_credentials(true),
         );
     }
     router
@@ -118,18 +191,18 @@ pub fn app(db: Db, cors_origins: &[String]) -> Router {
 /* ---------- Fehler ---------- */
 
 #[derive(Debug)]
-pub struct ApiError(StatusCode, String);
+pub struct ApiError(pub(crate) StatusCode, pub(crate) String);
 
-fn bad(msg: impl Into<String>) -> ApiError {
+pub(crate) fn bad(msg: impl Into<String>) -> ApiError {
     ApiError(StatusCode::BAD_REQUEST, msg.into())
 }
-fn conflict(msg: impl Into<String>) -> ApiError {
+pub(crate) fn conflict(msg: impl Into<String>) -> ApiError {
     ApiError(StatusCode::CONFLICT, msg.into())
 }
-fn not_found(msg: impl Into<String>) -> ApiError {
+pub(crate) fn not_found(msg: impl Into<String>) -> ApiError {
     ApiError(StatusCode::NOT_FOUND, msg.into())
 }
-fn internal() -> ApiError {
+pub(crate) fn internal() -> ApiError {
     ApiError(
         StatusCode::INTERNAL_SERVER_ERROR,
         "Interner Fehler im Hub-Server.".into(),
@@ -158,15 +231,15 @@ impl IntoResponse for ApiError {
     }
 }
 
-type ApiResult<T> = Result<T, ApiError>;
+pub(crate) type ApiResult<T> = Result<T, ApiError>;
 
 /// JSON lesen, Fehler aber als Problem Details statt axums Klartext.
-fn parse<T: for<'de> Deserialize<'de>>(body: &Bytes) -> ApiResult<T> {
+pub(crate) fn parse<T: for<'de> Deserialize<'de>>(body: &Bytes) -> ApiResult<T> {
     serde_json::from_slice(body).map_err(|_| bad("Ungültige Eingabe."))
 }
 
 /// IDs aus dem Pfad selbst lesen, damit auch hier Problem Details statt Klartext zurückkommen.
-fn parse_id(raw: &str) -> ApiResult<i64> {
+pub(crate) fn parse_id(raw: &str) -> ApiResult<i64> {
     raw.parse()
         .map_err(|_| bad(format!("„{raw}“ ist keine gültige ID.")))
 }
@@ -174,17 +247,20 @@ fn parse_id(raw: &str) -> ApiResult<i64> {
 /* ---------- Spieler ---------- */
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlayerDto {
     id: i64,
     name: String,
+    /// Hat sich der Spieler schon registriert? Die Seite bietet beim Registrieren nur freie Spieler an.
+    has_account: bool,
 }
 
 #[derive(Deserialize)]
-struct PlayerRequest {
-    name: Option<String>,
+pub(crate) struct PlayerRequest {
+    pub(crate) name: Option<String>,
 }
 
-fn player_name(req: PlayerRequest) -> ApiResult<String> {
+pub(crate) fn player_name(req: PlayerRequest) -> ApiResult<String> {
     let name = req.name.unwrap_or_default().trim().to_string();
     if name.is_empty() {
         return Err(bad("Bitte einen Namen eingeben."));
@@ -197,7 +273,7 @@ fn player_name(req: PlayerRequest) -> ApiResult<String> {
 
 /// Vergleich ohne Groß-/Kleinschreibung, auch für Umlaute (SQLite-lower() kann nur ASCII).
 /// Die Spielerliste einer Runde ist klein, darum wird in Rust verglichen.
-fn name_taken(conn: &Connection, name: &str, except: i64) -> rusqlite::Result<bool> {
+pub(crate) fn name_taken(conn: &Connection, name: &str, except: i64) -> rusqlite::Result<bool> {
     let wanted = name.to_lowercase();
     let mut stmt = conn.prepare("SELECT name FROM player WHERE id <> ?1")?;
     let names = stmt.query_map([except], |r| r.get::<_, String>(0))?;
@@ -211,11 +287,15 @@ fn name_taken(conn: &Connection, name: &str, except: i64) -> rusqlite::Result<bo
 
 async fn list_players(State(db): State<Db>) -> ApiResult<Json<Vec<PlayerDto>>> {
     run(db, |conn| {
-        let mut stmt = conn.prepare("SELECT id, name FROM player ORDER BY name COLLATE NOCASE")?;
+        let mut stmt = conn.prepare(
+            "SELECT p.id, p.name, EXISTS(SELECT 1 FROM account a WHERE a.player_id = p.id)
+             FROM player p ORDER BY p.name COLLATE NOCASE",
+        )?;
         let rows = stmt.query_map([], |r| {
             Ok(PlayerDto {
                 id: r.get(0)?,
                 name: r.get(1)?,
+                has_account: r.get(2)?,
             })
         })?;
         Ok(Json(rows.collect::<Result<_, _>>()?))
@@ -223,8 +303,24 @@ async fn list_players(State(db): State<Db>) -> ApiResult<Json<Vec<PlayerDto>>> {
     .await
 }
 
+/// So steht ein Spieler im Verlauf.
+pub(crate) fn player_snapshot(conn: &Connection, id: i64) -> rusqlite::Result<Value> {
+    let name: String =
+        conn.query_row("SELECT name FROM player WHERE id = ?1", [id], |r| r.get(0))?;
+    Ok(json!({ "id": id, "name": name }))
+}
+
+fn has_account(conn: &Connection, player_id: i64) -> rusqlite::Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM account WHERE player_id = ?1)",
+        [player_id],
+        |r| r.get(0),
+    )
+}
+
 async fn create_player(
     State(db): State<Db>,
+    user: User,
     body: Bytes,
 ) -> ApiResult<(StatusCode, Json<PlayerDto>)> {
     let name = player_name(parse(&body)?)?;
@@ -234,20 +330,35 @@ async fn create_player(
                 "Es gibt schon einen Spieler namens „{name}“."
             )));
         }
-        conn.execute("INSERT INTO player (name) VALUES (?1)", [&name])?;
+        let tx = conn.transaction()?;
+        tx.execute("INSERT INTO player (name) VALUES (?1)", [&name])?;
+        let id = tx.last_insert_rowid();
+        history::record(
+            &tx,
+            &user,
+            "create",
+            "player",
+            id,
+            None,
+            Some(player_snapshot(&tx, id)?),
+        )?;
+        tx.commit()?;
         Ok((
             StatusCode::CREATED,
             Json(PlayerDto {
-                id: conn.last_insert_rowid(),
+                id,
                 name,
+                has_account: false,
             }),
         ))
     })
     .await
 }
 
+/// Umbenennen darf jeder sich selbst und Spieler ohne Account; Spieler mit Account nur der Admin.
 async fn rename_player(
     State(db): State<Db>,
+    user: User,
     UrlPath(id): UrlPath<String>,
     body: Bytes,
 ) -> ApiResult<Json<PlayerDto>> {
@@ -262,35 +373,44 @@ async fn rename_player(
         if !exists {
             return Err(not_found(format!("Spieler {id} gibt es nicht.")));
         }
+        let account = has_account(conn, id)?;
+        if account && id != user.player_id && !user.admin {
+            return Err(auth::forbidden(
+                "Spieler mit Account können sich nur selbst umbenennen.",
+            ));
+        }
         if name_taken(conn, &name, id)? {
             return Err(conflict(format!(
                 "Es gibt schon einen Spieler namens „{name}“."
             )));
         }
-        conn.execute(
+        let tx = conn.transaction()?;
+        let before = player_snapshot(&tx, id)?;
+        tx.execute(
             "UPDATE player SET name = ?1 WHERE id = ?2",
             params![name, id],
         )?;
-        Ok(Json(PlayerDto { id, name }))
+        history::record(
+            &tx,
+            &user,
+            "update",
+            "player",
+            id,
+            Some(before),
+            Some(player_snapshot(&tx, id)?),
+        )?;
+        tx.commit()?;
+        Ok(Json(PlayerDto {
+            id,
+            name,
+            has_account: account,
+        }))
     })
     .await
 }
 
-async fn delete_player(
-    State(db): State<Db>,
-    UrlPath(id): UrlPath<String>,
-) -> ApiResult<StatusCode> {
-    let id = parse_id(&id)?;
-    run(db, move |conn| delete_player_tx(conn, id)).await
-}
-
-fn delete_player_tx(conn: &mut Connection, id: i64) -> ApiResult<StatusCode> {
-    let name: Option<String> = conn
-        .query_row("SELECT name FROM player WHERE id = ?1", [id], |r| r.get(0))
-        .optional()?;
-    let Some(name) = name else {
-        return Err(not_found(format!("Spieler {id} gibt es nicht.")));
-    };
+/// Ein Spieler kann nicht gelöscht werden, wenn er in Spielen eingetragen ist oder einen Account hat.
+fn player_in_use(conn: &Connection, id: i64, name: &str) -> ApiResult<()> {
     let games: i64 = conn.query_row(
         "SELECT count(*) FROM participant WHERE player_id = ?1",
         [id],
@@ -302,8 +422,63 @@ fn delete_player_tx(conn: &mut Connection, id: i64) -> ApiResult<StatusCode> {
             "{name} ist in {games} {word} eingetragen und kann darum nicht gelöscht werden. Umbenennen geht."
         )));
     }
-    conn.execute("DELETE FROM player WHERE id = ?1", [id])?;
-    Ok(StatusCode::NO_CONTENT)
+    if has_account(conn, id)? {
+        return Err(conflict(format!(
+            "{name} hat einen Account. Erst den Account löschen, dann den Spieler."
+        )));
+    }
+    Ok(())
+}
+
+async fn delete_player(
+    State(db): State<Db>,
+    user: User,
+    UrlPath(id): UrlPath<String>,
+) -> ApiResult<StatusCode> {
+    let id = parse_id(&id)?;
+    run(db, move |conn| {
+        let name: Option<String> = conn
+            .query_row("SELECT name FROM player WHERE id = ?1", [id], |r| r.get(0))
+            .optional()?;
+        let Some(name) = name else {
+            return Err(not_found(format!("Spieler {id} gibt es nicht.")));
+        };
+        player_in_use(conn, id, &name)?;
+        let tx = conn.transaction()?;
+        let before = player_snapshot(&tx, id)?;
+        tx.execute("DELETE FROM invite WHERE player_id = ?1", [id])?;
+        tx.execute("DELETE FROM player WHERE id = ?1", [id])?;
+        history::record(&tx, &user, "delete", "player", id, Some(before), None)?;
+        tx.commit()?;
+        Ok(StatusCode::NO_CONTENT)
+    })
+    .await
+}
+
+/// Rückgängig: Spieler auf einen früheren Stand setzen (`None` = gab es noch nicht).
+pub(crate) fn restore_player(conn: &Connection, id: i64, state: Option<&Value>) -> ApiResult<()> {
+    match state {
+        None => {
+            let name: String =
+                conn.query_row("SELECT name FROM player WHERE id = ?1", [id], |r| r.get(0))?;
+            player_in_use(conn, id, &name)?;
+            conn.execute("DELETE FROM invite WHERE player_id = ?1", [id])?;
+            conn.execute("DELETE FROM player WHERE id = ?1", [id])?;
+        }
+        Some(v) => {
+            let name = v["name"].as_str().unwrap_or_default();
+            if name_taken(conn, name, id)? {
+                return Err(conflict(format!(
+                    "Es gibt inzwischen einen anderen Spieler namens „{name}“."
+                )));
+            }
+            conn.execute(
+                "INSERT INTO player (id, name) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET name = ?2",
+                params![id, name],
+            )?;
+        }
+    }
+    Ok(())
 }
 
 /* ---------- Spiele ---------- */
@@ -317,7 +492,7 @@ pub struct ParticipantDto {
     placement: Option<i64>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameDto {
     id: i64,
@@ -489,7 +664,7 @@ fn read_game(r: &rusqlite::Row) -> rusqlite::Result<GameDto> {
 
 const GAME_COLS: &str = "id, scheduled_at, location, status, points_to_win, notes, version";
 
-fn load_game(conn: &Connection, id: i64) -> ApiResult<GameDto> {
+pub(crate) fn load_game(conn: &Connection, id: i64) -> ApiResult<GameDto> {
     let game = conn
         .query_row(
             &format!("SELECT {GAME_COLS} FROM game WHERE id = ?1"),
@@ -566,7 +741,15 @@ async fn get_game(State(db): State<Db>, UrlPath(id): UrlPath<String>) -> ApiResu
     run(db, move |conn| Ok(Json(load_game(conn, id)?))).await
 }
 
-async fn create_game(State(db): State<Db>, body: Bytes) -> ApiResult<(StatusCode, Json<GameDto>)> {
+fn game_json(g: &GameDto) -> Value {
+    serde_json::to_value(g).expect("serialisierbar")
+}
+
+async fn create_game(
+    State(db): State<Db>,
+    user: User,
+    body: Bytes,
+) -> ApiResult<(StatusCode, Json<GameDto>)> {
     let input = validate(parse(&body)?)?;
     run(db, move |conn| {
         let tx = conn.transaction()?;
@@ -577,6 +760,7 @@ async fn create_game(State(db): State<Db>, body: Bytes) -> ApiResult<(StatusCode
         let id = tx.last_insert_rowid();
         save_participants(&tx, id, &input.participants)?;
         let game = load_game(&tx, id)?;
+        history::record(&tx, &user, "create", "game", id, None, Some(game_json(&game)))?;
         tx.commit()?;
         Ok((StatusCode::CREATED, Json(game)))
     })
@@ -585,6 +769,7 @@ async fn create_game(State(db): State<Db>, body: Bytes) -> ApiResult<(StatusCode
 
 async fn update_game(
     State(db): State<Db>,
+    user: User,
     UrlPath(id): UrlPath<String>,
     body: Bytes,
 ) -> ApiResult<Json<GameDto>> {
@@ -600,12 +785,9 @@ async fn update_game(
     let input = validate(req)?;
     run(db, move |conn| {
         let tx = conn.transaction()?;
-        let current: Option<i64> = tx
-            .query_row("SELECT version FROM game WHERE id = ?1", [id], |r| r.get(0))
-            .optional()?;
-        let current = current.ok_or_else(|| not_found(format!("Spiel {id} gibt es nicht.")))?;
+        let before = load_game(&tx, id)?;
         // Optimistisches Sperren: zwei gleichzeitige Bearbeitungen überschreiben sich nicht stillschweigend.
-        if client_version != current {
+        if client_version != before.version {
             return Err(conflict(STALE));
         }
         tx.execute(
@@ -615,19 +797,51 @@ async fn update_game(
         )?;
         save_participants(&tx, id, &input.participants)?;
         let game = load_game(&tx, id)?;
+        history::record(&tx, &user, "update", "game", id, Some(game_json(&before)), Some(game_json(&game)))?;
         tx.commit()?;
         Ok(Json(game))
     })
     .await
 }
 
-async fn delete_game(State(db): State<Db>, UrlPath(id): UrlPath<String>) -> ApiResult<StatusCode> {
+async fn delete_game(
+    State(db): State<Db>,
+    user: User,
+    UrlPath(id): UrlPath<String>,
+) -> ApiResult<StatusCode> {
     let id = parse_id(&id)?;
     run(db, move |conn| {
-        if conn.execute("DELETE FROM game WHERE id = ?1", [id])? == 0 {
-            return Err(not_found(format!("Spiel {id} gibt es nicht.")));
-        }
+        let tx = conn.transaction()?;
+        let before = load_game(&tx, id)?;
+        tx.execute("DELETE FROM game WHERE id = ?1", [id])?;
+        history::record(
+            &tx,
+            &user,
+            "delete",
+            "game",
+            id,
+            Some(game_json(&before)),
+            None,
+        )?;
+        tx.commit()?;
         Ok(StatusCode::NO_CONTENT)
     })
     .await
+}
+
+/// Rückgängig: Spiel auf einen früheren Stand setzen (`None` = gab es noch nicht).
+pub(crate) fn restore_game(conn: &Connection, id: i64, state: Option<&Value>) -> ApiResult<()> {
+    let Some(v) = state else {
+        conn.execute("DELETE FROM game WHERE id = ?1", [id])?;
+        return Ok(());
+    };
+    let g: GameDto =
+        serde_json::from_value(v.clone()).map_err(|_| bad("Alter Stand ist unlesbar."))?;
+    conn.execute(
+        "INSERT INTO game (id, scheduled_at, location, status, points_to_win, notes, version) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7 + 1)
+         ON CONFLICT(id) DO UPDATE SET scheduled_at = ?2, location = ?3, status = ?4, points_to_win = ?5, notes = ?6,
+             version = game.version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+        params![id, g.scheduled_at, g.location, g.status, g.points_to_win, g.notes, g.version],
+    )?;
+    save_participants(conn, id, &g.participants)
 }

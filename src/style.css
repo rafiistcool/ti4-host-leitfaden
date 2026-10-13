@@ -821,6 +821,31 @@ body.is-wide #view{max-width:1440px;padding-top:16px}
 .hb-addrow{display:flex;flex-wrap:wrap;gap:8px}
 .hb-addrow select,.hb-addrow input{flex:1 1 180px}
 .hb-inline{display:flex;flex-wrap:wrap;gap:8px}
+
+/* Login, Profil, Admin, Verlauf */
+.hb.ro [data-w]{display:none!important}
+.hb-acct{display:inline-flex;align-items:center;gap:8px;margin-left:auto;padding:7px 12px;border-radius:8px;border:1px solid var(--hb-line-2);color:var(--hb-ink);text-decoration:none;font-weight:600;font-size:14px;max-width:200px}
+.hb-acct span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb-acct svg{stroke:var(--hb-gold);flex:none}
+.hb-acct.login{border-color:var(--hb-gold);color:var(--hb-gold-2)}
+.hb-acct.on{background:#16233d;border-color:#2b4170}
+.hb-mode a{color:var(--hb-gold-2)}
+.hb-two{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+.hb-narrow{max-width:520px}
+.hb-fields.one{grid-template-columns:minmax(0,1fr)}
+.hb-hint code{font-family:var(--f-mono);font-size:13px;background:#0b1120;padding:1px 5px;border-radius:4px}
+.hb-code{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 12px;border-radius:10px;background:#0b1120;border:1px dashed var(--hb-gold)}
+.hb-code span{flex-basis:100%;font-size:12px;font-weight:700;color:var(--hb-muted);letter-spacing:.06em;text-transform:uppercase}
+.hb-code b{font-family:var(--f-mono);font-size:18px;color:var(--hb-gold-2);word-break:break-all;flex:1 1 160px}
+.hb-code.wide b{font-size:13.5px}
+.hb-log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.hb-log li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:9px 0;border-top:1px solid var(--hb-line);font-size:14.5px}
+.hb-log time{color:var(--hb-muted);font-size:13px;min-width:140px}
+.hb-log span{flex:1 1 220px}
+.hb-log small{color:var(--hb-muted)}
+.hb-log li.undone span{opacity:.6}
+.hb-tbl small{color:var(--hb-muted)}
+@media (min-width:900px){.hb-two{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .hb-inline input{flex:1 1 200px}
 .hb-inline.sm input{min-height:32px;padding:4px 8px;flex-basis:120px}
 .hb-tbl{overflow-x:auto}
@@ -829,6 +854,7 @@ body.is-wide #view{max-width:1440px;padding-top:16px}
 .hb-tbl td{padding:8px;border-bottom:1px solid var(--hb-line);vertical-align:middle}
 .hb-tbl .num{text-align:right;font-variant-numeric:tabular-nums}
 .hb-td-a{white-space:nowrap;text-align:right}
+.hb-td-a .hb-mini+.hb-mini{margin-left:6px}
 #hb-toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:60;max-width:min(92vw,520px);
   padding:10px 16px;border-radius:10px;background:#1b2b1f;border:1px solid #2f7a4b;color:#d9f5e3;font-size:15px;font-weight:600;transition:opacity .2s,transform .2s;box-shadow:0 8px 30px rgba(0,0,0,.4)}
 #hb-toast.show{opacity:1;transform:translate(-50%,0)}
