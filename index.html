@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TI4 Host-Leitfaden</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: sticky Kopf mit Runden-Tracker + Phasen-Tabs, darunter eine Lesespalte pro Tab (Checklisten, Regelkarten, Nachschlagetabellen) */
+:root{
+  --bg:#eceff4;
+  --surface:#f9fafc;
+  --ink:#172033;
+  --muted:#586379;
+  --line:#d2d8e3;
+  --accent:#9a6a12;
+  --accent-soft:#f3e7cf;
+  --warn:#b4372f;
+  --warn-soft:#f8e3e0;
+  --ok:#2c7a4b;
+  --sc1:#c83a32;--sc2:#e07b22;--sc3:#d8b21c;--sc4:#3f8f3c;--sc5:#1f9aa3;--sc6:#3e86c9;--sc7:#2a4f9c;--sc8:#7b4aa8;
+  --f-display:"Saira Condensed","Arial Narrow",sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e131c;--surface:#151c28;--ink:#e5e9f0;--muted:#97a2b5;--line:#273145;
+    --accent:#e3b24e;--accent-soft:#2d2716;--warn:#ef7d72;--warn-soft:#2f1a19;--ok:#6cc893;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e131c;--surface:#151c28;--ink:#e5e9f0;--muted:#97a2b5;--line:#273145;
+  --accent:#e3b24e;--accent-soft:#2d2716;--warn:#ef7d72;--warn-soft:#2f1a19;--ok:#6cc893;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+.wrap{max-width:900px;margin:0 auto;padding-inline:16px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding-block:12px 8px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:1.5rem;letter-spacing:.02em;line-height:1;margin:0}
+.brand small{display:block;font-family:var(--f-body);font-weight:600;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.tracker{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.round{display:flex;align-items:center;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.round button{border:0;background:none;color:var(--ink);font:600 1rem var(--f-body);width:32px;height:32px;cursor:pointer}
+.round span{font-family:var(--f-mono);font-size:.9rem;min-width:84px;text-align:center}
+.cust{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted);cursor:pointer}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:thin;padding-bottom:0}
+nav.tabs button{flex:none;border:0;background:none;color:var(--muted);font:600 .95rem var(--f-display);letter-spacing:.04em;text-transform:uppercase;padding:8px 10px 9px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs button:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding-block:24px 64px}
+section.tab{display:grid;gap:20px}
+h2{font-family:var(--f-display);font-weight:700;font-size:2rem;line-height:1.05;margin:0;text-wrap:balance;letter-spacing:.01em}
+h3{font-family:var(--f-display);font-weight:600;font-size:1.3rem;margin:0 0 8px;letter-spacing:.02em}
+h4{font-size:1rem;margin:12px 0 4px}
+p{margin:0 0 8px;max-width:68ch}
+.lead{color:var(--muted);max-width:68ch;margin:6px 0 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px;min-width:0}
+.card > :last-child{margin-bottom:0}
+.eyebrow{font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
+ul.plain{margin:0;padding-left:20px}
+ul.plain li{margin:3px 0}
+ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:4px;counter-reset:s}
+ol.steps > li{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid var(--line)}
+ol.steps > li:first-child{border-top:0}
+ol.steps > li::before{counter-increment:s;content:counter(s);font-family:var(--f-mono);font-size:.85rem;color:var(--accent);border:1px solid var(--accent);border-radius:50%;width:26px;height:26px;display:grid;place-items:center}
+ol.steps > li > div{min-width:0}
+ol.steps b{display:block}
+.chklist{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.chklist li label{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;padding:7px 6px;border-radius:6px;cursor:pointer}
+.chklist li label:hover{background:var(--accent-soft)}
+.chklist input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--accent)}
+.chklist input:checked + span{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.chklist .sub{display:block;font-size:.88rem;color:var(--muted);text-decoration:none}
+.chkhead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.chkhead h3{margin:0}
+.reset{border:1px solid var(--line);background:none;color:var(--muted);font:600 .8rem var(--f-body);padding:4px 10px;border-radius:5px;cursor:pointer}
+.reset:hover{color:var(--ink);border-color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--warn-soft);padding:10px 14px;border-radius:0 6px 6px 0}
+.note p{margin:0}
+.note b{color:var(--warn)}
+.tip{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 6px 6px 0}
+.tip p{margin:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.flow .ph{display:flex;flex-direction:column;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 14px;cursor:pointer;color:var(--ink);text-align:left;font:inherit;min-width:0}
+.flow .ph strong{font-family:var(--f-display);font-size:1.15rem;letter-spacing:.03em}
+.flow .ph span{font-size:.82rem;color:var(--muted)}
+.flow .arr{color:var(--muted);font-family:var(--f-mono)}
+.flow .ph.cond{border-style:dashed}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-top:1px solid var(--line)}
+th{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-top:0}
+td.num,th.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sc{display:grid;grid-template-columns:44px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.sc:first-of-type{border-top:0}
+.sc .n{font-family:var(--f-display);font-weight:700;font-size:1.6rem;color:#fff;border-radius:6px;display:grid;place-items:center;height:44px}
+.sc h4{margin:0;font-family:var(--f-display);font-size:1.15rem;letter-spacing:.03em}
+.sc h4 small{font-family:var(--f-body);font-weight:400;color:var(--muted);font-size:.85rem}
+.sc p{margin:2px 0;font-size:.95rem}
+.sc .lbl{font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.qa-search{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+.qa{display:grid;gap:10px}
+.qa details{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:0 16px}
+.qa summary{cursor:pointer;font-weight:600;padding:12px 0;list-style-position:outside}
+.qa details[open] summary{border-bottom:1px solid var(--line);margin-bottom:8px}
+.qa details > div{padding-bottom:12px}
+.tag{display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:1px 6px;border-radius:4px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:2px}
+.pok{color:var(--accent);border-color:var(--accent)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px}
+.kv div{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.kv b{display:block;font-family:var(--f-mono);font-size:1.3rem;font-weight:500;color:var(--accent)}
+.kv span{font-size:.88rem;color:var(--muted)}
+.en{color:var(--muted);font-size:.85em;font-style:italic}
+.empty{color:var(--muted);font-style:italic;display:none}
+footer{color:var(--muted);font-size:.82rem;padding-block:0 32px}
+@media (prefers-reduced-motion:no-preference){nav.tabs button{transition:color .15s,border-color .15s}}
+@media (max-width:520px){h2{font-size:1.65rem}.tracker{margin-left:0}}
+</style>
+<style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="bar">
+      <p class="brand">TI4 Host-Leitfaden<small>Twilight Imperium 4 · mit Prophecy of Kings</small></p>
+      <div class="tracker">
+        <div class="round" aria-label="Runde">
+          <button id="rdown" type="button" aria-label="Runde zurück">−</button>
+          <span id="rlabel">Runde 1</span>
+          <button id="rup" type="button" aria-label="Nächste Runde">+</button>
+        </div>
+        <label class="cust"><input type="checkbox" id="custodians"> Custodians entfernt</label>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Abschnitte">
+      <button role="tab" data-tab="ueberblick">Überblick</button>
+      <button role="tab" data-tab="strategie">Strategie</button>
+      <button role="tab" data-tab="aktion">Aktion</button>
+      <button role="tab" data-tab="taktik">Taktische Aktion</button>
+      <button role="tab" data-tab="kampf">Kampf</button>
+      <button role="tab" data-tab="status">Status</button>
+      <button role="tab" data-tab="agenda">Agenda</button>
+      <button role="tab" data-tab="timing">Wann darf ich…?</button>
+      <button role="tab" data-tab="handel">Handel</button>
+      <button role="tab" data-tab="limits">Limits</button>
+      <button role="tab" data-tab="pok">PoK neu</button>
+      <button role="tab" data-tab="setup">Aufbau</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ÜBERBLICK -->
+<section class="tab" id="ueberblick" role="tabpanel">
+  <div>
+    <h2>Ablauf einer Spielrunde</h2>
+    <p class="lead">Vier Phasen in fester Reihenfolge. Die Agendaphase gibt es erst, sobald jemand den Custodians-Marker von Mecatol Rex genommen hat. Tippe auf eine Phase für die Details.</p>
+  </div>
+  <div class="flow">
+    <button class="ph" data-go="strategie"><strong>1 · Strategie</strong><span>Strategiekarten wählen</span></button>
+    <span class="arr">→</span>
+    <button class="ph" data-go="aktion"><strong>2 · Aktion</strong><span>Züge bis alle passen</span></button>
+    <span class="arr">→</span>
+    <button class="ph" data-go="status"><strong>3 · Status</strong><span>Werten, Aufräumen</span></button>
+    <span class="arr">→</span>
+    <button class="ph cond" data-go="agenda" id="agendaChip"><strong>4 · Agenda</strong><span>erst nach Custodians</span></button>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <p class="eyebrow">Wer ist wann dran?</p>
+      <ul class="plain">
+        <li><b>Strategiephase:</b> ab Sprecher im Uhrzeigersinn.</li>
+        <li><b>Aktions- und Statusphase:</b> Initiativreihenfolge, also niedrigste Zahl auf der Strategiekarte zuerst. Wer zwei Karten hat, nimmt die niedrigere.</li>
+        <li><b>Agendaphase:</b> Abstimmen beginnt links vom Sprecher, der Sprecher stimmt zuletzt.</li>
+        <li><b>Sekundärfähigkeiten:</b> ab links vom aktiven Spieler im Uhrzeigersinn.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <p class="eyebrow">Spielende</p>
+      <ul class="plain">
+        <li>Wer <b>10 Siegpunkte</b> erreicht, gewinnt sofort, auch mitten in einer Phase.</li>
+        <li>Erreichen mehrere gleichzeitig 10 (z. B. Statusphase): wer in Initiativreihenfolge früher kommt, gewinnt.</li>
+        <li>Ist beim Aufdecken in der Statusphase kein öffentliches Ziel mehr übrig, endet das Spiel. Die meisten Punkte gewinnen, bei Gleichstand die frühere Initiative.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="eyebrow">Goldene Regeln</p>
+    <ul class="plain">
+      <li>Widerspricht eine Karte den Regeln, gilt die Karte.</li>
+      <li>„Kann nicht“ schlägt „kann“.</li>
+      <li>Die Living Rules Reference schlägt das Lernheft. Bei Streit dort nachschlagen.</li>
+      <li>Ein W10 zeigt „0“ als 10. Treffer = Würfel ≥ Kampfwert.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- STRATEGIE -->
+<section class="tab" id="strategie" role="tabpanel" hidden>
+  <div>
+    <h2>Strategiephase</h2>
+    <p class="lead">Jeder wählt seine Rolle für die Runde. Die Kartennummer ist zugleich die Initiative.</p>
+  </div>
+  <div class="card">
+    <div class="chkhead"><h3>Checkliste</h3><button class="reset" data-reset="strategie">Abhaken zurücksetzen</button></div>
+    <ul class="chklist" data-list="strategie">
+      <li><label><input type="checkbox"><span>Sprecher wählt zuerst eine Strategiekarte, dann reihum im Uhrzeigersinn.<span class="sub">Liegen Handelswaren auf der Karte, bekommt sie der Wählende.</span></span></label></li>
+      <li><label><input type="checkbox"><span>Bei 3 oder 4 Spielern: zweite Runde, jeder wählt eine zweite Karte (wieder ab Sprecher).<span class="sub">Bei 5 bis 8 Spielern hat jeder genau eine Karte.</span></span></label></li>
+      <li><label><input type="checkbox"><span>Sprecher legt 1 Handelsware auf jede nicht gewählte Karte.<span class="sub">Bei 4 und 8 Spielern werden alle Karten gewählt, dann entfällt das.</span></span></label></li>
+      <li><label><input type="checkbox"><span>Initiativreihenfolge für die Aktionsphase ansagen (niedrigste Kartennummer zuerst).</span></label></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Die acht Strategiekarten <span class="tag pok">PoK-Fassung</span></h3>
+    <p class="lead" style="margin-bottom:8px">Kurzfassung, die Kartentexte gelten. Sekundär kostet 1 Marker aus dem Strategie-Pool, wenn nicht anders angegeben.</p>
+    <div class="sc"><div class="n" style="background:var(--sc1)">1</div><div><h4>Leadership <small>Führung</small></h4>
+      <p><span class="lbl">Primär</span>3 Kommandomarker erhalten. Zusätzlich beliebig viel Einfluss ausgeben: je 3 Einfluss ein weiterer Marker.</p>
+      <p><span class="lbl">Sekundär</span>Einfluss ausgeben, je 3 Einfluss 1 Marker. <b>Kostet keinen Strategiemarker.</b></p></div></div>
+    <div class="sc"><div class="n" style="background:var(--sc2)">2</div><div><h4>Diplomacy <small>Diplomatie</small></h4>
+      <p><span class="lbl">Primär</span>Ein System mit eigenem Planeten wählen (nicht Mecatol Rex). Jeder andere Spieler legt einen Marker aus seiner Verstärkung hinein. Dann bis zu 2 eigene erschöpfte Planeten bereit machen.</p>
+      <p><span class="lbl">Sekundär</span>Bis zu 2 eigene erschöpfte Planeten bereit machen.</p></div></div>
+    <div class="sc"><div class="n" style="background:var(--sc3)">3</div><div><h4>Politics <small>Politik</small></h4>
+      <p><span class="lbl">Primär</span>Neuen Sprecher bestimmen: jeder außer dem aktuellen Sprecher, auch du selbst. 2 Aktionskarten ziehen. Die obersten 2 Agenden ansehen und jeweils oben oder unten zurücklegen.</p>
+      <p><span class="lbl">Sekundär</span>2 Aktionskarten ziehen.</p></div></div>
+    <div class="sc"><div class="n" style="background:var(--sc4)">4</div><div><h4>Construction <small>Bauwesen</small></h4>
+      <p><span class="lbl">Primär</span>1 PDS oder 1 Raumwerft auf einem eigenen Planeten platzieren, zusätzlich 1 PDS auf einem eigenen Planeten.</p>
+      <p><span class="lbl">Sekundär</span>Einen Marker in ein beliebiges System legen und dort 1 PDS oder 1 Raumwerft auf einem eigenen Planeten platzieren. Achtung: Das System gilt damit als von dir markiert, deine Schiffe dort können sich in dieser Runde nicht mehr bewegen.</p></div></div>
+    <div class="sc"><div class="n" style="background:var(--sc5)">5</div><div><h4>Trade <small>Handel</small></h4>
+      <p><span class="lbl">Primär</span>3 Handelswaren erhalten, eigene Rohstoffe auffüllen. Beliebige andere Spieler bestimmen, die die Sekundär gratis nutzen dürfen.</p>
+      <p><span class="lbl">Sekundär</span>Eigene Rohstoffe auffüllen.</p></div></div>
+    <div class="sc"><div class="n" style="background:var(--sc6)">6</div><div><h4>Warfare <small>Kriegsführung</small></h4>
+      <p><span class="lbl">Primär</span>1 eigenen Kommandomarker vom Spielplan nehmen, zurückerhalten und die Marker auf dem Kommandoblatt neu verteilen. Damit kann ein System doppelt genutzt werden.</p>
+      <p><span class="lbl">Sekundär</span>Die PRODUKTION einer Raumwerft im eigenen Heimatsystem nutzen, ohne das System zu aktivieren.</p></div></div>
+    <div class="sc"><div class="n" style="background:var(--sc7)">7</div><div><h4>Technology <small>Technologie</small></h4>
+      <p><span class="lbl">Primär</span>1 Technologie erforschen. Für 6 Ressourcen eine weitere.</p>
+      <p><span class="lbl">Sekundär</span>4 Ressourcen zahlen und 1 Technologie erforschen.</p></div></div>
+    <div class="sc"><div class="n" style="background:var(--sc8)">8</div><div><h4>Imperial <small>Imperium</small></h4>
+      <p><span class="lbl">Primär</span>Sofort 1 öffentliches Ziel werten, falls erfüllt. Dann 1 Siegpunkt, wenn du Mecatol Rex kontrollierst, sonst 1 Geheimziel ziehen.</p>
+      <p><span class="lbl">Sekundär</span>1 Geheimziel ziehen.</p></div></div>
+  </div>
+</section>
+
+<!-- AKTION -->
+<section class="tab" id="aktion" role="tabpanel" hidden>
+  <div>
+    <h2>Aktionsphase</h2>
+    <p class="lead">In Initiativreihenfolge macht jeder <b>eine</b> Aktion pro Zug. Das geht reihum, bis alle gepasst haben.</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <p class="eyebrow">Aktion A</p><h3>Strategische Aktion</h3>
+      <ul class="plain">
+        <li>Primärfähigkeit der eigenen Strategiekarte ausführen, Karte erschöpfen.</li>
+        <li>Dann darf jeder andere Spieler die Sekundärfähigkeit nutzen, reihum ab links vom aktiven Spieler.</li>
+        <li>Die eigene Sekundär darfst du nie nutzen.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <p class="eyebrow">Aktion B</p><h3>Taktische Aktion</h3>
+      <ul class="plain">
+        <li>System aktivieren, bewegen, kämpfen, landen, produzieren.</li>
+        <li>Kostet 1 Marker aus dem Taktik-Pool.</li>
+        <li>Details im Tab <a href="#taktik" data-go="taktik">Taktische Aktion</a>.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <p class="eyebrow">Aktion C</p><h3>Komponentenaktion</h3>
+      <ul class="plain">
+        <li>Alles mit <b>„AKTION:“</b> bzw. „ACTION:“: Aktionskarten, Technologien, Anführer, Schuldscheine, Relikte, Reliktfragmente, legendäre Planeten, Fraktionsfähigkeiten.</li>
+        <li>Nur erlaubt, wenn die Fähigkeit vollständig ausgeführt werden kann.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <p class="eyebrow">Aktion D</p><h3>Passen</h3>
+      <ul class="plain">
+        <li>Erst erlaubt, wenn alle eigenen Strategiekarten genutzt (erschöpft) sind.</li>
+        <li>Danach keine Züge mehr in dieser Phase.</li>
+        <li>Wenn alle gepasst haben: weiter zur Statusphase.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chkhead"><h3>Checkliste pro Zug</h3><button class="reset" data-reset="aktion">Abhaken zurücksetzen</button></div>
+    <ul class="chklist" data-list="aktion">
+      <li><label><input type="checkbox"><span>„Zu Beginn deines Zuges“-Effekte abwickeln.</span></label></li>
+      <li><label><input type="checkbox"><span>Genau eine Aktion wählen: strategisch, taktisch, Komponente oder passen.</span></label></li>
+      <li><label><input type="checkbox"><span>Transaktionen? Mit jedem Nachbarn höchstens eine pro Zug, jederzeit im eigenen Zug.</span></label></li>
+      <li><label><input type="checkbox"><span>Geheimziel mit „Aktionsphase“ erfüllt? Sofort werten (pro Kampf maximal ein Ziel).</span></label></li>
+      <li><label><input type="checkbox"><span>„Am Ende deines Zuges“-Effekte (z. B. manche Agenten) abwickeln, dann ist der Nächste dran.</span></label></li>
+    </ul>
+  </div>
+
+  <div class="note"><p><b>Wer gepasst hat,</b> darf weiterhin Sekundärfähigkeiten anderer nutzen, Aktionskarten ohne „Aktion“ spielen, abstimmen und sich verteidigen. Er kann auch weiter angegriffen werden.</p></div>
+</section>
+
+<!-- TAKTISCHE AKTION -->
+<section class="tab" id="taktik" role="tabpanel" hidden>
+  <div>
+    <h2>Taktische Aktion</h2>
+    <p class="lead">Fünf Schritte, immer in dieser Reihenfolge. Jeder Schritt findet statt, auch wenn nichts passiert. Du darfst also produzieren, ohne dich bewegt zu haben.</p>
+  </div>
+  <div class="card">
+    <div class="chkhead"><h3>Checkliste</h3><button class="reset" data-reset="taktik">Abhaken zurücksetzen</button></div>
+    <ul class="chklist" data-list="taktik">
+      <li><label><input type="checkbox"><span><b>1 · Aktivierung:</b> Marker aus dem Taktik-Pool in ein System ohne eigenen Marker legen.<span class="sub">Fremde Marker stören nicht. Danach „nach Aktivierung“-Effekte (viele Agenten).</span></span></label></li>
+      <li><label><input type="checkbox"><span><b>2a · Schiffe bewegen:</b> erst ansagen, welche Schiffe fliegen, dann kommen alle gleichzeitig an.</span></label></li>
+      <li><label><input type="checkbox"><span><b>2b · Raumkanonen-Offensive:</b> alle Spieler mit SPACE CANNON im aktiven System (oder Reichweite in Nachbarsysteme, z. B. PDS II) dürfen auf Schiffe im aktiven System schießen.</span></label></li>
+      <li><label><input type="checkbox"><span><b>3 · Raumkampf:</b> nur wenn zwei Spieler Schiffe im System haben.</span></label></li>
+      <li><label><input type="checkbox"><span><b>4 · Invasion:</b> Bombardement, Bodentruppen absetzen, Raumkanonen-Verteidigung, Bodenkampf, Kontrolle übernehmen.</span></label></li>
+      <li><label><input type="checkbox"><span><b>5 · Produktion:</b> PRODUKTION-Einheiten im aktiven System nutzen.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Ende:</b> „Ende der taktischen Aktion“-Effekte. Mit Dark Energy Tap: Frontier-Marker im System erkunden, wenn du dort Schiffe hast.</span></label></li>
+    </ul>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Bewegung</h3>
+      <ul class="plain">
+        <li>Schiffe starten nur aus Systemen <b>ohne</b> eigenen Kommandomarker. Schiffe, die schon im aktiven System stehen, bleiben einfach.</li>
+        <li><b>Durch</b> Systeme mit eigenem Marker fliegen ist erlaubt.</li>
+        <li>Nicht durch Systeme mit fremden Schiffen. Auch fremde Jäger allein blockieren.</li>
+        <li>Bewegungswert = Anzahl der Systeme, die das Schiff betritt. Ziel ist immer das aktive System.</li>
+        <li>Wurmlöcher gleichen Typs sind benachbart (Alpha zu Alpha, Beta zu Beta, Gamma zu Gamma).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Transport</h3>
+      <ul class="plain">
+        <li>Schiffe mit Kapazität nehmen Bodentruppen und Jäger mit.</li>
+        <li>Einsammeln im Startsystem, in durchflogenen Systemen und im aktiven System, aber nicht aus Systemen mit eigenem Marker (außer dem aktiven).</li>
+        <li>Bodentruppen auf einem Planeten wechseln nie direkt auf einen anderen Planeten, sie brauchen ein Schiff.</li>
+        <li>Mehr Jäger oder Bodentruppen im Raum als Kapazität: Überschuss sofort entfernen (im Kampf erst am Kampfende prüfen).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Anomalien</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Anomalie</th><th>Was gilt</th></tr></thead>
+      <tbody>
+        <tr><td><b>Asteroidenfeld</b></td><td>Nicht betreten oder durchfliegen. Ausnahme: Antimass Deflectors.</td></tr>
+        <tr><td><b>Supernova</b></td><td>Nicht betreten oder durchfliegen.</td></tr>
+        <tr><td><b>Nebel</b></td><td>Nur betreten, wenn es das aktive System ist. Schiffe, die im Nebel starten, haben Bewegung 1. Der Verteidiger erhält im Nebel +1 auf Kampfwürfe. Kein Rückzug in einen Nebel.</td></tr>
+        <tr><td><b>Gravitationsriss</b></td><td>+1 Bewegung für Schiffe, die ihn verlassen oder durchfliegen. Für jedes solche Schiff würfeln: bei 1 bis 3 wird es zerstört, samt Transportiertem.</td></tr>
+        <tr><td><b>Ionensturm</b> <span class="tag pok">PoK</span></td><td>Kommt über die Frontier-Karte. Wirkt als Alpha- oder Beta-Wurmloch und dreht sich, nachdem Schiffe ihn genutzt haben.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <h3>Produktion</h3>
+    <ul class="plain">
+      <li>Raumwerft: Produktionslimit = Ressourcenwert ihres Planeten + 2 (Space Dock II: + 4).</li>
+      <li>Jäger und Infanterie: 2 Stück für Kosten 1. Beide zählen gegen das Produktionslimit.</li>
+      <li>Bezahlen mit Ressourcen (Planeten erschöpfen) und Handelswaren (1 HW = 1 Ressource).</li>
+      <li>Schiffe kommen in den Raumbereich, Bodentruppen auf den Planeten mit der Raumwerft.</li>
+      <li>Fremde Schiffe im System (Blockade): keine Schiffe produzieren.</li>
+      <li>PDS und Raumwerften werden nie produziert, nur über Construction oder Effekte platziert.</li>
+      <li>Danach Flottenlimit prüfen: Nicht-Jäger-Schiffe pro System ≤ Marker im Flotten-Pool.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- KAMPF -->
+<section class="tab" id="kampf" role="tabpanel" hidden>
+  <div>
+    <h2>Raumkampf, Invasion, Bodenkampf</h2>
+    <p class="lead">Der aktive Spieler ist Angreifer. Pro Kampf darf jeder Spieler höchstens ein Ziel werten.</p>
+  </div>
+
+  <div class="card">
+    <div class="chkhead"><h3>Raumkampf</h3><button class="reset" data-reset="raumkampf">Abhaken zurücksetzen</button></div>
+    <ul class="chklist" data-list="raumkampf">
+      <li><label><input type="checkbox"><span><b>Vor dem Kampf / Start des Kampfes:</b> passende Aktionskarten, Agenten und Fähigkeiten.<span class="sub">In Runde 1 sind „Start des Kampfes“ und „Start der Kampfrunde“ dasselbe Fenster.</span></span></label></li>
+      <li><label><input type="checkbox"><span><b>1 · Anti-Fighter Barrage</b> (nur Runde 1): beide Seiten gleichzeitig, Treffer nur gegen Jäger.</span></label></li>
+      <li><label><input type="checkbox"><span><b>2 · Rückzug ansagen:</b> erst der Verteidiger, dann der Angreifer.<span class="sub">Sagt der Verteidiger Rückzug an, darf der Angreifer in dieser Runde nicht. Ansagen nur, wenn es ein gültiges Zielsystem gibt.</span></span></label></li>
+      <li><label><input type="checkbox"><span><b>3 · Würfeln:</b> Angreifer würfelt komplett zuerst, dann der Verteidiger. Ein Würfel pro Schiff (Burst-Symbole = mehr Würfel). Neuwürfe sofort nach dem eigenen Wurf.</span></label></li>
+      <li><label><input type="checkbox"><span><b>4 · Treffer zuweisen:</b> jeder wählt eigene Schiffe. Vorher darf Schadensresistenz (SUSTAIN DAMAGE) Treffer annullieren, Einheit wird gekippt.</span></label></li>
+      <li><label><input type="checkbox"><span><b>5 · Rückzug ausführen:</b> alle Schiffe mit Bewegung in <b>ein</b> benachbartes System mit eigenen Einheiten oder eigenem Planeten und ohne fremde Schiffe. Dort einen Marker aus der Verstärkung hinlegen, falls noch keiner liegt.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Weiter?</b> Haben beide noch Schiffe: neue Runde ab Schritt 2.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Kampfende:</b> Kapazität prüfen und überschüssige Jäger und Bodentruppen entfernen. „Ende des Kampfes“-Effekte.</span></label></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="chkhead"><h3>Invasion</h3><button class="reset" data-reset="invasion">Abhaken zurücksetzen</button></div>
+    <ul class="chklist" data-list="invasion">
+      <li><label><input type="checkbox"><span><b>1 · Bombardement:</b> Einheiten mit BOMBARDMENT beschießen Planeten im aktiven System, der Besitzer weist Treffer zu.<span class="sub">PLANETARY SHIELD (z. B. PDS) verhindert Bombardement. Der War Sun ignoriert das.</span></span></label></li>
+      <li><label><input type="checkbox"><span><b>2 · Bodentruppen absetzen:</b> beliebig viele aus dem Raumbereich auf beliebige Planeten des Systems.<span class="sub">Mecatol Rex mit Custodians-Marker: 6 Einfluss zahlen, Marker nehmen, +1 Siegpunkt. Ab jetzt gibt es Agendaphasen.</span></span></label></li>
+      <li><label><input type="checkbox"><span><b>3 · Raumkanonen-Verteidigung:</b> SPACE CANNON-Einheiten auf dem Zielplaneten schießen auf die gelandeten Truppen. Nur Einheiten auf genau diesem Planeten.</span></label></li>
+      <li><label><input type="checkbox"><span><b>4 · Bodenkampf</b> auf jedem umkämpften Planeten, der aktive Spieler wählt die Reihenfolge.</span></label></li>
+      <li><label><input type="checkbox"><span><b>5 · Kontrolle übernehmen:</b> Planeten mit eigenen Bodentruppen gehören dir. Planetenkarte erschöpft nehmen. Fremde Strukturen dort werden zerstört.<span class="sub">War der Planet vorher von niemandem kontrolliert: erkunden (PoK). Bei Unentschieden behält der Verteidiger den Planeten.</span></span></label></li>
+    </ul>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Bodenkampf</h3>
+      <ol class="steps">
+        <li><div><b>Start-Effekte</b>„Start des Kampfes“ und „Start der Kampfrunde“.</div></li>
+        <li><div><b>Würfeln</b>Ein Würfel pro Bodentruppe (Infanterie, Mechs).</div></li>
+        <li><div><b>Treffer zuweisen</b>Mechs dürfen Schadensresistenz nutzen.</div></li>
+        <li><div><b>Wiederholen</b>bis nur eine Seite (oder keine) übrig ist.</div></li>
+      </ol>
+      <div class="note" style="margin-top:10px"><p><b>Kein Rückzug</b> aus dem Bodenkampf, niemals.</p></div>
+    </div>
+    <div class="card">
+      <h3>Was verhindert was?</h3>
+      <ul class="plain">
+        <li><b>Planetary Shield</b> verhindert Bombardement (nicht beim War Sun).</li>
+        <li><b>Fremde Schiffe im Weg</b> verhindern Durchflug.</li>
+        <li><b>Eigener Marker im Startsystem</b> verhindert Bewegung dieser Schiffe.</li>
+        <li><b>Blockade</b> (fremde Schiffe bei deiner Werft) verhindert Schiffsproduktion.</li>
+        <li><b>Flottenlimit</b> begrenzt Nicht-Jäger-Schiffe pro System.</li>
+        <li><b>Nebel, Asteroiden, Supernova</b> begrenzen Rückzugsziele.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- STATUS -->
+<section class="tab" id="status" role="tabpanel" hidden>
+  <div>
+    <h2>Statusphase</h2>
+    <p class="lead">Acht Schritte in fester Reihenfolge. Wer werten will, muss bei Schritt 1 bereit sein.</p>
+  </div>
+  <div class="card">
+    <div class="chkhead"><h3>Checkliste</h3><button class="reset" data-reset="status">Abhaken zurücksetzen</button></div>
+    <ul class="chklist" data-list="status">
+      <li><label><input type="checkbox"><span><b>1 · Ziele werten:</b> in Initiativreihenfolge je höchstens 1 öffentliches und 1 geheimes Ziel (mit „Statusphase“).</span></label></li>
+      <li><label><input type="checkbox"><span><b>2 · Öffentliches Ziel aufdecken:</b> der Sprecher deckt das nächste auf. Stufe II erst, wenn alle Stufe I offen sind.</span></label></li>
+      <li><label><input type="checkbox"><span><b>3 · Aktionskarten ziehen:</b> jeder 1 Karte, in Initiativreihenfolge. Mehr als 7: sofort auf 7 abwerfen.</span></label></li>
+      <li><label><input type="checkbox"><span><b>4 · Kommandomarker einsammeln:</b> alle eigenen Marker vom Spielplan zurück in die Verstärkung.</span></label></li>
+      <li><label><input type="checkbox"><span><b>5 · Marker erhalten und verteilen:</b> jeder bekommt 2 Marker und darf alle Marker auf Taktik, Flotte und Strategie neu verteilen.<span class="sub">Flotten-Pool verkleinert? Flottenlimit in jedem System prüfen.</span></span></label></li>
+      <li><label><input type="checkbox"><span><b>6 · Karten bereit machen:</b> Planeten, Technologien, Agenten, Relikte und alles andere Erschöpfte.</span></label></li>
+      <li><label><input type="checkbox"><span><b>7 · Einheiten reparieren:</b> gekippte Einheiten wieder aufstellen.</span></label></li>
+      <li><label><input type="checkbox"><span><b>8 · Strategiekarten zurückgeben.</b> Custodians weg? Dann Agendaphase, sonst neue Runde.</span></label></li>
+    </ul>
+  </div>
+  <div class="tip"><p><b>Host-Tipp:</b> Schritt 1 laut aufrufen und Spieler für Spieler abfragen. Danach wird nicht mehr gewertet, auch nicht „ich hätte noch schnell…“.</p></div>
+</section>
+
+<!-- AGENDA -->
+<section class="tab" id="agenda" role="tabpanel" hidden>
+  <div>
+    <h2>Agendaphase</h2>
+    <p class="lead">Nur wenn der Custodians-Marker entfernt wurde. Zwei Agenden pro Phase.</p>
+  </div>
+  <div class="note" id="agendaInactive"><p><b>Noch inaktiv:</b> Der Custodians-Marker liegt noch auf Mecatol Rex. Diese Runde endet nach der Statusphase.</p></div>
+  <div class="card">
+    <div class="chkhead"><h3>Checkliste pro Agenda</h3><button class="reset" data-reset="agenda">Abhaken zurücksetzen</button></div>
+    <ul class="chklist" data-list="agenda">
+      <li><label><input type="checkbox"><span>„Zu Beginn der Agendaphase“-Effekte (z. B. Maw of Worlds), nur bei der ersten Agenda.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Aufdecken:</b> Sprecher zieht die oberste Agenda und liest sie mit allen möglichen Ergebnissen vor.</span></label></li>
+      <li><label><input type="checkbox"><span><b>„Wenn eine Agenda aufgedeckt wird“:</b> z. B. Karten, die die Agenda abwerfen und ersetzen.</span></label></li>
+      <li><label><input type="checkbox"><span><b>„Nachdem eine Agenda aufgedeckt wurde“:</b> Rider-Karten. Vorhersagen müssen vor der ersten Stimme gemacht werden.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Abstimmen:</b> links vom Sprecher beginnend, Sprecher zuletzt. Jeder sagt laut sein Ergebnis an.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Auswerten:</b> meiste Stimmen gewinnt. Gleichstand oder null Stimmen: Sprecher entscheidet (zählt nicht als Stimme).</span></label></li>
+      <li><label><input type="checkbox"><span><b>Ergebnis umsetzen:</b> „Für“/„Wahl“ bei Gesetzen bleibt liegen. Direktiven und „Gegen“ kommen auf den Ablagestapel.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Rider auflösen</b> in Sprecherreihenfolge.</span></label></li>
+      <li><label><input type="checkbox"><span>Zweite Agenda genauso. Danach: <b>alle Planeten bereit machen</b> (nur Planeten). Neue Runde.</span></label></li>
+    </ul>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Abstimmungsregeln</h3>
+      <ul class="plain">
+        <li>Stimmen = Einfluss der erschöpften Planeten. Ein Planet gibt immer seinen vollen Wert.</li>
+        <li>Alle eigenen Stimmen gehen an dasselbe Ergebnis.</li>
+        <li><b>Handelswaren zählen nicht als Stimmen.</b></li>
+        <li>Enthalten ist erlaubt. Null Stimmen = Enthaltung.</li>
+        <li>Wahl eines Planeten: nur Planeten, die jemand kontrolliert. Wahl eines Spielers: auch sich selbst.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Nebenbei</h3>
+      <ul class="plain">
+        <li>Pro Agenda darf jedes Spielerpaar 1 Transaktion machen, Nachbarschaft egal.</li>
+        <li>Abstimmen ist nicht „dein Zug“ für Karteneffekte.</li>
+        <li>Wird eine Agenda ersetzt, dürfen Transaktionen für die neue erneut stattfinden.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- TIMING -->
+<section class="tab" id="timing" role="tabpanel" hidden>
+  <div>
+    <h2>Wann darf ich…?</h2>
+    <p class="lead">Schnellsuche für die typischen Streitfragen am Tisch.</p>
+  </div>
+  <input class="qa-search" id="qaSearch" type="search" placeholder="Suchen, z. B. Aktionskarte, Sabotage, Rückzug, passen">
+  <div class="qa" id="qa">
+    <details><summary>…eine Aktionskarte mit „Aktion:“ spielen?</summary><div><p>Nur in deinem eigenen Zug der Aktionsphase, als deine Aktion für diesen Zug (Komponentenaktion). Nicht nach dem Passen, nicht im Zug anderer, nicht in anderen Phasen.</p></div></details>
+    <details><summary>…eine Aktionskarte ohne „Aktion“ spielen?</summary><div><p>Genau dann, wenn der fett gedruckte Auslöser eintritt, z. B. „Zu Beginn einer Kampfrunde“ oder „Nachdem ein anderer Spieler ein System aktiviert hat“. Das geht auch im Zug anderer, nach dem Passen und in jeder Phase, solange der Auslöser passt. Es kostet keine Aktion.</p></div></details>
+    <details><summary>…zwei gleiche Aktionskarten spielen?</summary><div><p>Nicht im selben Timing-Fenster auf dieselben Einheiten oder denselben Effekt. Wurde die erste Kopie per Sabotage annulliert, gilt sie als nicht gespielt, dann darfst du die zweite spielen.</p></div></details>
+    <details><summary>…Sabotage spielen?</summary><div><p>Wenn ein anderer Spieler eine Aktionskarte spielt (außer Sabotage). Die Zielkarte hat keine Wirkung und wird abgeworfen. Nicht gegen eigene Karten.</p></div></details>
+    <details><summary>…etwas tun, wenn mehrere gleichzeitig wollen?</summary><div><p>Aktionsphase: der aktive Spieler zuerst, dann die anderen in Initiativreihenfolge, reihum, bis niemand mehr etwas spielen will. Strategie- und Agendaphase: ab Sprecher im Uhrzeigersinn. Jeder hat pro Durchgang eine Fähigkeit.</p></div></details>
+    <details><summary>…„Wenn“ und „Nachdem“ unterscheiden?</summary><div><p>„Wenn“ (When) greift unmittelbar vor dem Ereignis und kann es verändern oder ersetzen. „Nachdem“ (After) greift direkt danach. Das „Wenn“-Fenster kommt immer zuerst.</p></div></details>
+    <details><summary>…passen?</summary><div><p>Sobald alle deine Strategiekarten genutzt sind. Mit zwei Karten (3–4 Spieler) müssen beide erschöpft sein.</p></div></details>
+    <details><summary>…eine Sekundärfähigkeit nutzen?</summary><div><p>Wenn ein anderer Spieler die strategische Aktion seiner Karte macht. Reihum ab links vom aktiven Spieler. Kostet in der Regel 1 Marker aus dem Strategie-Pool (Leadership nicht). Geht auch, wenn du schon gepasst hast.</p></div></details>
+    <details><summary>…ein System aktivieren, in dem ein fremder Marker liegt?</summary><div><p>Ja. Nur ein System mit deinem eigenen Marker kannst du nicht aktivieren.</p></div></details>
+    <details><summary>…mich zurückziehen?</summary><div><p>Nur im Raumkampf: ansagen in Schritt 2 (Verteidiger zuerst), ausführen in Schritt 5. Aus dem Bodenkampf nie.</p></div></details>
+    <details><summary>…Ziele werten?</summary><div><p>Statusphase Schritt 1: je 1 öffentliches und 1 geheimes. Geheimziele mit „Aktionsphase“ sofort, wenn erfüllt. Imperial-Primär wertet ein öffentliches Ziel sofort. Pro Kampf höchstens ein Ziel.</p></div></details>
+    <details><summary>…einen Agenten nutzen? <span class="tag pok">PoK</span></summary><div><p>Wann seine Karte es sagt, oft auch zugunsten anderer Spieler. Danach erschöpft, in der Statusphase (Schritt 6) wieder bereit.</p></div></details>
+    <details><summary>…einen Planeten für Ressourcen und Einfluss gleichzeitig nutzen?</summary><div><p>Nein. Ein erschöpfter Planet liefert entweder Ressourcen oder Einfluss. Neu eroberte Planeten kommen erschöpft ins Spiel.</p></div></details>
+    <details><summary>…Reliktfragmente eintauschen? <span class="tag pok">PoK</span></summary><div><p>Als Komponentenaktion: 3 Fragmente desselben Typs abwerfen, 1 Relikt ziehen. Unbekannte Fragmente zählen als jeder Typ.</p></div></details>
+    <details><summary>…gepasste Spieler angreifen?</summary><div><p>Ja. Passen schützt nicht. Der gepasste Spieler verteidigt sich normal und darf passende Aktionskarten spielen.</p></div></details>
+    <details><summary>…eigene Schuldscheine spielen?</summary><div><p>Nein, Schuldscheine deiner eigenen Farbe kannst du nie spielen. Du gibst sie per Transaktion weiter.</p></div></details>
+    <p class="empty" id="qaEmpty">Keine passende Frage. Anderer Suchbegriff?</p>
+  </div>
+</section>
+
+<!-- HANDEL -->
+<section class="tab" id="handel" role="tabpanel" hidden>
+  <div>
+    <h2>Handel und Absprachen</h2>
+    <p class="lead">Transaktionen sind verbindlich, Absprachen nicht.</p>
+  </div>
+  <div class="card">
+    <div class="chkhead"><h3>Prüfliste vor jeder Transaktion</h3><button class="reset" data-reset="handel">Abhaken zurücksetzen</button></div>
+    <ul class="chklist" data-list="handel">
+      <li><label><input type="checkbox"><span><b>Ist es der Zug eines der beiden?</b> In der Aktionsphase nur im Zug des aktiven Spielers.<span class="sub">Agendaphase: jederzeit während einer Agenda, mit jedem Spieler.</span></span></label></li>
+      <li><label><input type="checkbox"><span><b>Sind die beiden Nachbarn?</b> (Aktionsphase) Einheiten oder Planeten im selben oder in benachbarten Systemen, auch über Wurmlöcher.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Erste Transaktion mit diesem Partner in diesem Zug?</b> Pro Zug nur eine pro Nachbar, auch bei mehreren Aktionen.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Nur erlaubte Dinge:</b> Handelswaren, Rohstoffe, Reliktfragmente, höchstens 1 Schuldschein pro Seite.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Bedingungen vorher klar?</b> Nach dem Austausch kann nichts rückgängig gemacht werden.</span></label></li>
+      <li><label><input type="checkbox"><span><b>Rohstoffe umwandeln:</b> erhaltene Rohstoffe werden beim Empfänger zu Handelswaren.</span></label></li>
+    </ul>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Handelbar</h3>
+      <ul class="plain">
+        <li>Handelswaren</li>
+        <li>Rohstoffe (Commodities)</li>
+        <li>1 Schuldschein pro Seite</li>
+        <li>Reliktfragmente <span class="tag pok">PoK</span></li>
+        <li>Gefangene Einheiten an den Besitzer zurück</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Nicht handelbar</h3>
+      <ul class="plain">
+        <li>Aktionskarten (Ausnahme: Emirates of Hacan)</li>
+        <li>Technologien, Ziele, Planeten</li>
+        <li>Relikte</li>
+        <li>Kommandomarker, Einheiten</li>
+      </ul>
+    </div>
+  </div>
+  <div class="tip"><p><b>Absprachen</b> („Ich greife dich nicht an, wenn…“) sind jederzeit erlaubt und nicht bindend. Bindend ist nur, was sofort als Transaktion ausgetauscht wird. Ungleiche Tausche und Geschenke sind erlaubt.</p></div>
+</section>
+
+<!-- LIMITS -->
+<section class="tab" id="limits" role="tabpanel" hidden>
+  <div>
+    <h2>Limits und Zahlen</h2>
+    <p class="lead">Was jeder maximal haben darf, auf einen Blick.</p>
+  </div>
+  <div class="kv">
+    <div><b>10</b><span>Siegpunkte zum Sieg (Variante 14)</span></div>
+    <div><b>7</b><span>Aktionskarten auf der Hand, Überschuss sofort abwerfen</span></div>
+    <div><b>3</b><span>Geheimziele, gewertet und ungewertet zusammen</span></div>
+    <div><b>3 / 3 / 2</b><span>Startmarker Taktik / Flotte / Strategie</span></div>
+    <div><b>+2</b><span>Kommandomarker pro Statusphase</span></div>
+    <div><b>16</b><span>Kommandomarker pro Farbe insgesamt</span></div>
+    <div><b>2 PDS · 1 Werft</b><span>Strukturen pro Planet</span></div>
+    <div><b>4</b><span>Mechs pro Spieler</span></div>
+    <div><b>2</b><span>Agenden pro Agendaphase</span></div>
+    <div><b>6 Einfluss</b><span>Custodians von Mecatol Rex nehmen, +1 SP</span></div>
+    <div><b>3 gleiche</b><span>Reliktfragmente für 1 Relikt</span></div>
+    <div><b>1</b><span>Ziel pro Kampf maximal</span></div>
+  </div>
+  <div class="card">
+    <h3>Pro Spieler und Phase</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Was</th><th>Regel</th></tr></thead>
+      <tbody>
+        <tr><td>Strategiekarten</td><td>3–4 Spieler: 2 pro Person. 5–8 Spieler: 1 pro Person.</td></tr>
+        <tr><td>Flottenlimit</td><td>Nicht-Jäger-Schiffe pro System ≤ Marker im Flotten-Pool. Überschuss sofort entfernen.</td></tr>
+        <tr><td>Kapazität</td><td>Jäger und Bodentruppen im Raum ≤ Kapazität der Schiffe dort. Bis zu 3 Jäger pro Raumwerft zählen nicht mit.</td></tr>
+        <tr><td>Rohstoffe</td><td>Bis zum Rohstoffwert der Fraktion. Handelswaren unbegrenzt.</td></tr>
+        <tr><td>Transaktionen</td><td>1 pro Nachbar pro Zug. In der Agendaphase 1 pro Spielerpaar pro Agenda.</td></tr>
+        <tr><td>Öffentliche Ziele</td><td>Statusphase: max. 1 öffentliches + 1 geheimes pro Spieler.</td></tr>
+        <tr><td>Einheiten</td><td>Begrenzt durch das Plastik im Spiel. Jäger und Infanterie haben Ersatzmarker.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <h3>Standard-Einheitenwerte</h3>
+    <p class="lead" style="margin-bottom:8px">Ohne Upgrades. Fraktionsblatt und Technologien gehen vor.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Einheit</th><th class="num">Kosten</th><th class="num">Kampf</th><th class="num">Bew.</th><th class="num">Kap.</th><th>Fähigkeiten</th></tr></thead>
+      <tbody>
+        <tr><td>Jäger</td><td class="num">1 (×2)</td><td class="num">9</td><td class="num">–</td><td class="num">–</td><td>muss transportiert werden</td></tr>
+        <tr><td>Infanterie</td><td class="num">1 (×2)</td><td class="num">8</td><td class="num">–</td><td class="num">–</td><td>Bodentruppe</td></tr>
+        <tr><td>Zerstörer</td><td class="num">1</td><td class="num">9</td><td class="num">2</td><td class="num">–</td><td>Anti-Fighter Barrage 9 (×2)</td></tr>
+        <tr><td>Kreuzer</td><td class="num">2</td><td class="num">7</td><td class="num">2</td><td class="num">–</td><td></td></tr>
+        <tr><td>Träger</td><td class="num">3</td><td class="num">9</td><td class="num">1</td><td class="num">4</td><td></td></tr>
+        <tr><td>Schlachtschiff</td><td class="num">4</td><td class="num">5</td><td class="num">1</td><td class="num">1</td><td>Schadensresistenz, Bombardement 5</td></tr>
+        <tr><td>War Sun</td><td class="num">12</td><td class="num">3 (×3)</td><td class="num">2</td><td class="num">6</td><td>nur mit Technologie; Schadensresistenz, Bombardement 3 (×3), ignoriert Planetary Shield</td></tr>
+        <tr><td>Mech <span class="tag pok">PoK</span></td><td class="num">2</td><td class="num">6</td><td class="num">–</td><td class="num">–</td><td>Schadensresistenz, Fraktionsfähigkeit (Werte je Fraktion prüfen)</td></tr>
+        <tr><td>PDS</td><td class="num">–</td><td class="num">–</td><td class="num">–</td><td class="num">–</td><td>Space Cannon 6, Planetary Shield</td></tr>
+        <tr><td>Raumwerft</td><td class="num">–</td><td class="num">–</td><td class="num">–</td><td class="num">–</td><td>Produktion = Ressourcen + 2</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- POK -->
+<section class="tab" id="pok" role="tabpanel" hidden>
+  <div>
+    <h2>Neu mit Prophecy of Kings</h2>
+    <p class="lead">Was ihr am Wochenende zum ersten Mal im Blick behalten müsst.</p>
+  </div>
+  <div class="card">
+    <h3>Anführer</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Typ</th><th>Freischalten</th><th>Nutzung</th></tr></thead>
+      <tbody>
+        <tr><td><b>Agent</b></td><td>Von Beginn an frei</td><td>Erschöpfen für den Effekt, oft auch für andere Spieler. Statusphase Schritt 6 wieder bereit.</td></tr>
+        <tr><td><b>Commander</b></td><td>Bedingung auf der Karte erfüllen. Wird nie wieder gesperrt.</td><td>Dauerhafte Fähigkeit. Mit dem Alliance-Schuldschein an andere verleihbar.</td></tr>
+        <tr><td><b>Held</b></td><td>Sobald du 3 Ziele gewertet hast (öffentlich oder geheim)</td><td>Einmalige starke Fähigkeit, danach aus dem Spiel entfernen.</td></tr>
+      </tbody>
+    </table></div>
+    <p style="margin-top:8px">Commander-Bedingungen werden erst geprüft, wenn ein Effekt komplett abgehandelt ist.</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Mechs</h3>
+      <ul class="plain">
+        <li>Schwere Bodentruppe, max. 4 pro Spieler.</li>
+        <li>Zählen als „Bodentruppen“, aber nicht als „Infanterie“.</li>
+        <li>Haben Schadensresistenz und eine Fraktionsfähigkeit, manche DEPLOY (ohne Produktion aufs Brett).</li>
+        <li>Brauchen Transport wie Infanterie. Mechkarten sind keine Technologien.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Planeten erkunden</h3>
+      <ul class="plain">
+        <li>Übernimmst du einen Planeten, den <b>niemand</b> kontrolliert hat, erkundest du ihn.</li>
+        <li>Karte vom Stapel seiner Eigenschaft ziehen: Kulturell, Industriell oder Gefährlich. Sofort ausführen.</li>
+        <li>Planeten ohne Eigenschaft (Heimatsysteme, Mecatol Rex) werden nicht erkundet.</li>
+        <li>Mehrere gleichzeitig: Reihenfolge selbst wählen, jeden einzeln abhandeln.</li>
+        <li>Anhänge (ATTACH) und Fragmente bleiben liegen, der Rest wird abgeworfen.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Frontier-Marker</h3>
+      <ul class="plain">
+        <li>Beim Aufbau in jedes System ohne Planeten (leere Systeme, planetenlose Anomalien, Wurmloch-Systeme). Hyperlanes zählen nicht als Systeme.</li>
+        <li>Erkunden nur mit der Technologie <b>Dark Energy Tap</b> nach einer taktischen Aktion im System mit eigenen Schiffen, oder wenn ein Effekt es erlaubt.</li>
+        <li>Danach kommt der Marker weg. Gezogen wird vom Frontier-Stapel.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Reliktfragmente und Relikte</h3>
+      <ul class="plain">
+        <li>Fragmente gibt es Kulturell, Industriell, Gefährlich und Unbekannt (zählt als jeder Typ).</li>
+        <li>Komponentenaktion: 3 gleiche abwerfen, 1 Relikt ziehen.</li>
+        <li>Fragmente sind handelbar, Relikte nicht.</li>
+        <li>Achtung: Shard of the Throne bringt 1 SP und wechselt den Besitzer, wenn jemand deinen legendären Planeten oder Heimatplaneten erobert.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Legendäre Planeten</h3>
+      <ul class="plain">
+        <li>Wer sie kontrolliert, bekommt die zugehörige Fähigkeitskarte.</li>
+        <li>Mallice liegt im Wormhole Nexus. Der Nexus startet inaktiv neben dem Spielplan (nur Gamma) und wird aktiv (Alpha, Beta, Gamma), sobald eine Einheit hineinkommt oder jemand Mallice kontrolliert.</li>
+        <li>Gamma-Wurmlöcher entstehen auch durch Erkundungskarten.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Sonstiges</h3>
+      <ul class="plain">
+        <li>Bis zu 8 Spieler, Hyperlanes für 5 und 7 Spieler.</li>
+        <li>Neue Schuldscheine (Alliance), Aktionskarten, Agenden, Ziele.</li>
+        <li>Neue fraktionslose Technologien, u. a. Dark Energy Tap, Scanlink Drone Network, Sling Relay, Predictive Intelligence.</li>
+        <li>PoK-Fassung der Strategiekarten verwenden.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- SETUP -->
+<section class="tab" id="setup" role="tabpanel" hidden>
+  <div>
+    <h2>Aufbau mit PoK</h2>
+    <p class="lead">Host-Liste für vor dem Spiel. Die Living Rules Reference („Setup“) hat die vollständige Liste.</p>
+  </div>
+  <div class="card">
+    <div class="chkhead"><h3>Checkliste</h3><button class="reset" data-reset="setup">Abhaken zurücksetzen</button></div>
+    <ul class="chklist" data-list="setup">
+      <li><label><input type="checkbox"><span>Fraktionen, Farben und Sitzplätze festlegen. Sprecher zufällig bestimmen.</span></label></li>
+      <li><label><input type="checkbox"><span>Galaxie bauen (Mecatol Rex in die Mitte, Heimatsysteme, Systeme legen oder Kartenstring verwenden).</span></label></li>
+      <li><label><input type="checkbox"><span>Frontier-Marker in jedes System ohne Planeten legen.</span></label></li>
+      <li><label><input type="checkbox"><span>Wormhole Nexus inaktiv neben den Spielplan legen.</span></label></li>
+      <li><label><input type="checkbox"><span>Custodians-Marker auf Mecatol Rex.</span></label></li>
+      <li><label><input type="checkbox"><span>Jeder Spieler: Fraktionsblatt, Kommandoblatt mit 3 Taktik / 3 Flotte / 2 Strategie, Rest in die Verstärkung.</span></label></li>
+      <li><label><input type="checkbox"><span>Starteinheiten und Starttechnologien laut Fraktionsblatt, Heimatplanetenkarten nehmen.</span></label></li>
+      <li><label><input type="checkbox"><span>Anführerblatt: Agent frei, Commander und Held gesperrt. Mechkarte dazu.</span></label></li>
+      <li><label><input type="checkbox"><span>Schuldscheine der eigenen Farbe inkl. Fraktions- und Alliance-Schuldschein.</span></label></li>
+      <li><label><input type="checkbox"><span>Stapel mischen: Aktion, Agenda, Geheimziele, 3 Erkundungsstapel, Frontier, Relikte.</span></label></li>
+      <li><label><input type="checkbox"><span>5 Ziele Stufe I und 5 Ziele Stufe II verdeckt auslegen, die ersten 2 Stufe-I-Ziele aufdecken.</span></label></li>
+      <li><label><input type="checkbox"><span>Jeder zieht 2 Geheimziele und behält 1.</span></label></li>
+      <li><label><input type="checkbox"><span>Alle starten mit 0 Aktionskarten, 0 Rohstoffen und 0 Handelswaren (Fraktionsblatt prüfen).</span></label></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+<footer class="wrap">Kurzfassung auf Basis der Living Rules Reference (TI4 + Prophecy of Kings). Bei Abweichungen gelten Kartentext und Rules Reference.</footer>
+
+<script>
+(function(){
+  var store = {
+    get: function(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } },
+    set: function(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+  };
+
+  // Tabs
+  var tabs = document.querySelectorAll('nav.tabs button');
+  var panels = document.querySelectorAll('section.tab');
+  function show(id){
+    var found = false;
+    panels.forEach(function(p){ var on = p.id === id; p.hidden = !on; if(on) found = true; });
+    if(!found){ id = 'ueberblick'; panels.forEach(function(p){ p.hidden = p.id !== id; }); }
+    tabs.forEach(function(b){
+      var on = b.dataset.tab === id;
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      if(on && b.scrollIntoView){ try { b.scrollIntoView({block:'nearest', inline:'nearest'}); } catch(e){} }
+    });
+    store.set('ti4-tab', id);
+  }
+  tabs.forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.tab); window.scrollTo(0,0); }); });
+  document.querySelectorAll('[data-go]').forEach(function(el){
+    el.addEventListener('click', function(ev){ ev.preventDefault(); show(el.dataset.go); window.scrollTo(0,0); });
+  });
+  var initial = (location.hash || '').replace('#','') || store.get('ti4-tab') || 'ueberblick';
+  show(initial);
+
+  // Checklisten
+  var checks = store.get('ti4-checks') || {};
+  document.querySelectorAll('.chklist').forEach(function(list){
+    var key = list.dataset.list;
+    list.querySelectorAll('input[type=checkbox]').forEach(function(cb, i){
+      cb.id = 'chk-' + key + '-' + i;
+      cb.checked = !!checks[cb.id];
+      cb.addEventListener('change', function(){ checks[cb.id] = cb.checked; store.set('ti4-checks', checks); });
+    });
+  });
+  document.querySelectorAll('[data-reset]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var list = document.querySelector('.chklist[data-list="' + btn.dataset.reset + '"]');
+      if(!list) return;
+      list.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked = false; delete checks[cb.id]; });
+      store.set('ti4-checks', checks);
+    });
+  });
+
+  // Runde und Custodians
+  var state = store.get('ti4-round') || {round:1, cust:false};
+  var rl = document.getElementById('rlabel'), cust = document.getElementById('custodians');
+  var chip = document.getElementById('agendaChip'), inactive = document.getElementById('agendaInactive');
+  function render(){
+    rl.textContent = 'Runde ' + state.round;
+    cust.checked = !!state.cust;
+    chip.classList.toggle('cond', !state.cust);
+    chip.querySelector('span').textContent = state.cust ? 'zwei Agenden' : 'erst nach Custodians';
+    inactive.hidden = !!state.cust;
+    store.set('ti4-round', state);
+  }
+  document.getElementById('rup').addEventListener('click', function(){
+    state.round++;
+    ['strategie','status','agenda','aktion'].forEach(function(k){
+      var list = document.querySelector('.chklist[data-list="'+k+'"]');
+      list.querySelectorAll('input').forEach(function(cb){ cb.checked = false; delete checks[cb.id]; });
+    });
+    store.set('ti4-checks', checks);
+    render();
+  });
+  document.getElementById('rdown').addEventListener('click', function(){ if(state.round > 1){ state.round--; render(); } });
+  cust.addEventListener('change', function(){ state.cust = cust.checked; render(); });
+  render();
+
+  // Suche
+  var q = document.getElementById('qaSearch'), items = document.querySelectorAll('#qa details'), empty = document.getElementById('qaEmpty');
+  q.addEventListener('input', function(){
+    var t = q.value.trim().toLowerCase(), n = 0;
+    items.forEach(function(d){
+      var hit = !t || d.textContent.toLowerCase().indexOf(t) !== -1;
+      d.hidden = !hit; if(hit) n++;
+      if(t && hit) d.open = true;
+    });
+    empty.style.display = n ? 'none' : 'block';
+  });
+})();
+</script>
+</body>
+</html>
