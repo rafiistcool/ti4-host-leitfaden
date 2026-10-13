@@ -191,6 +191,10 @@
     if (step.warn) h += '<div class="note warn"><p><b>Achtung:</b> ' + md(step.warn) + "</p></div>";
     if (step.refs && step.refs.length) h += '<div class="chips"><span class="k">Dazu nachschlagen</span>' + step.refs.map(refChip).join("") + "</div>";
     if (st.p === 2 && st.s === total - 1 && !st.cust) h += '<p class="locked-note">Der Hütermarker liegt noch auf Mecatol Rex, darum folgt keine Agendaphase. Wird er entfernt, oben umschalten.</p>';
+    h += '<div class="allsteps"><span class="k">' + esc(ph.name) + " · alle Schritte</span>" + ph.steps.map(function (x, j) {
+      return '<button type="button" class="' + (j < st.s ? "done" : (j === st.s ? "cur" : "")) + '" data-act="step" data-p="' + st.p + '" data-s="' + j + '"' + (j === st.s ? ' aria-current="step"' : "") +
+        '><span class="n">' + (j < st.s ? "✓" : j + 1) + "</span><span>" + md(x.t) + "</span></button>";
+    }).join("") + "</div>";
     var up = ph.steps.slice(st.s + 1, st.s + 3);
     if (up.length) {
       h += '<div class="upcoming"><span class="k">Danach</span>' + up.map(function (u, k) {
@@ -421,36 +425,43 @@
     }
   }
 
+  /* Seitenleiste: Suche oben, dann drei feste Gruppen. Phasen und Schritte klappen nur im Ablauf auf. */
   function renderRail() {
     var el = document.getElementById("rail");
-    var tab = currentTab();
+    var tab = currentTab(), onAblauf = route.v === "ablauf";
+    var themen = route.v === "nachschlagen" || (route.v === "topic" && route.tab !== "kampf");
     el.innerHTML = '<div class="brand"><b>TI4 Host</b><span>Prophezeiung der Könige</span></div>' +
-      '<div><div class="k">Runde ' + st.round + "</div>" + PH.map(function (ph, i) {
-        var cls = "rail-ph" + (i < st.p ? " done" : "") + (i === st.p ? " cur" : "") + (locked(i) ? " locked" : "");
-        var sub = locked(i) ? "erst nach dem Hütermarker" : (i < st.p ? "erledigt" : ph.steps.length + " Schritte");
-        var mark = i < st.p ? "✓" : String(i + 1);
-        var h = '<button type="button" class="' + cls + '" data-act="phase" data-i="' + i + '"><span class="m">' + mark + '</span><span><span class="nm">' + esc(ph.name) + '</span><span class="sb">' + sub + "</span></span></button>";
-        if (i === st.p) {
-          h += '<div class="rail-steps">' + ph.steps.map(function (s, j) {
-            return '<button type="button" class="rail-st' + (j < st.s ? " done" : "") + (j === st.s ? " cur" : "") + '" data-act="step" data-p="' + i + '" data-s="' + j + '"><span class="n">' + (j + 1) + "</span><span>" + esc(s.t) + "</span></button>";
-          }).join("") + "</div>";
-        }
-        return h;
-      }).join("") + "</div>" +
+      '<a class="rail-search' + (tab === "suche" ? " cur" : "") + '" href="#suche">' + svg("search", 18) + '<span>Suchen</span><kbd title="Taste /">/</kbd></a>' +
       '<nav class="rail-nav" aria-label="Bereiche">' +
-      railLink("#ablauf", "ablauf", "Ablauf", tab === "ablauf") +
+      '<p class="rail-h">Am Tisch</p>' +
+      railLink("#ablauf", "ablauf", "Ablauf", onAblauf, "Runde " + st.round + " · " + phaseShort()) +
+      (onAblauf ? railPhases() : "") +
       railLink("#kampf", "kampf", "Kampf", tab === "kampf") +
+      '<p class="rail-h">Vorbereitung</p>' +
       railLink("#aufbau", "aufbau", "Aufbau", route.rail === "aufbau") +
       railLink("#generator", "map", "Kartengenerator", route.rail === "generator") +
-      railLink("#nachschlagen", "book", "Nachschlagen", tab === "nachschlagen" && !route.rail && route.v !== "regeln" && route.v !== "credits") +
+      '<p class="rail-h">Nachschlagen</p>' +
+      railLink("#nachschlagen", "book", "Themen", themen) +
       railLink("#regeln", "az", "Regeln A–Z", route.v === "regeln") +
       railLink("#fraktionen", "faction", "Fraktionen", route.rail === "fraktionen") +
       railLink("#technologien", "tech", "Technologien", route.rail === "technologien") +
       railLink("#karten", "cards", "Karten", route.rail === "karten") +
-      railLink("#suche", "search", "Suche", tab === "suche") +
-      railLink("#credits", "info", "Über und Credits", route.v === "credits") + "</nav>";
+      "</nav>" +
+      '<a class="rail-foot' + (route.v === "credits" ? " cur" : "") + '" href="#credits">' + svg("info", 16) + "Über und Credits</a>";
   }
-  function railLink(href, icon, label, cur) { return '<a href="' + href + '"' + (cur ? ' aria-current="page"' : "") + ">" + svg(icon, 20) + label + "</a>"; }
+  function railPhases() {
+    return '<div class="rail-sub">' +
+      '<div class="rail-phases" role="group" aria-label="Phasen">' + PH.map(function (p, i) {
+        var cls = i < st.p ? "done" : (i === st.p ? "cur" : "");
+        if (locked(i)) cls += " locked";
+        return '<button type="button" class="' + cls + '" data-act="phase" data-i="' + i + '"' + (locked(i) ? ' aria-disabled="true" title="Erst nach Entfernen des Hütermarkers"' : "") +
+          '><span class="bar"></span><span class="lbl">' + esc(p.short) + "</span></button>";
+      }).join("") + "</div></div>";
+  }
+  function railLink(href, icon, label, cur, sub) {
+    return '<a href="' + href + '"' + (cur ? ' aria-current="page"' : "") + ">" + svg(icon, 20) +
+      '<span class="tx"><span>' + label + "</span>" + (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></a>";
+  }
 
   function renderDock() {
     var bar = document.getElementById("actionbar");
@@ -561,6 +572,13 @@
   });
   document.addEventListener("keydown", function (ev) {
     if ((ev.key === "Enter" || ev.key === " ") && ev.target.getAttribute && ev.target.getAttribute("data-act") === "hex") { ev.preventDefault(); ev.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); return; }
+    var tg = (ev.target.tagName || "").toLowerCase();
+    if (ev.key === "/" && tg !== "input" && tg !== "textarea" && !ev.altKey && !ev.ctrlKey && !ev.metaKey) {
+      ev.preventDefault();
+      if (route.v !== "suche") go("suche");
+      setTimeout(function () { var q = document.getElementById("q"); if (q) q.focus(); }, 30);
+      return;
+    }
     if (route.v !== "ablauf" || ev.altKey || ev.ctrlKey || ev.metaKey) return;
     var tag = (ev.target.tagName || "").toLowerCase();
     if (tag === "input" || tag === "textarea") return;
