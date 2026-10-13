@@ -7,6 +7,7 @@
 Nur Python-Standardbibliothek, keine Abhängigkeiten.
 """
 import hashlib
+import base64
 import json
 import pathlib
 import shutil
@@ -16,6 +17,7 @@ ROOT = pathlib.Path(__file__).resolve().parent
 SRC = ROOT / "src"
 DATA = ["data/ablauf.js", "data/themen.js", "data/regeln-1.js", "data/regeln-2.js",
         "data/tiles.js", "data/layouts.js", "data/fraktionen.js", "data/karten-1.js", "data/karten-2.js",
+        "data/de-namen.js", "data/reference-assets.js", "data/original-assets.js", "data/english-sheets.js", "assets.js",
         "map.js", "aufbau.js", "kompendium.js"]
 
 GOOGLE_FONTS = (
@@ -99,10 +101,12 @@ def build_site() -> pathlib.Path:
     shutil.copy2(SRC / "fonts" / "LICENSE-FONTS.txt", out / "fonts" / "LICENSE-FONTS.txt")
     for f in ICONS:
         shutil.copy2(SRC / "icons" / f, out / "icons" / f)
+    shutil.copytree(SRC / "assets", out / "assets")
     shutil.copy2(SRC / "pwa" / "manifest.webmanifest", out / "manifest.webmanifest")
 
     assets = ["./", "index.html", "manifest.webmanifest"] + \
-             ["fonts/" + f for _, _, _, f in LOCAL_FONTS] + ["icons/" + f for f in ICONS]
+             ["fonts/" + f for _, _, _, f in LOCAL_FONTS] + ["icons/" + f for f in ICONS] + \
+             [p.relative_to(out).as_posix() for p in sorted((out / "assets").rglob("*")) if p.is_file()]
     digest = hashlib.sha256()
     for a in assets[1:]:
         digest.update((out / a).read_bytes())
@@ -117,7 +121,20 @@ def build_site() -> pathlib.Path:
 def build_artifact() -> pathlib.Path:
     out = ROOT / "dist" / "artifact.html"
     out.parent.mkdir(exist_ok=True)
-    out.write_text(body(GOOGLE_FONTS, ""), encoding="utf-8")
+    html = body(GOOGLE_FONTS, "")
+    # Preserve the single-file export: image paths inside JS and generated markup
+    # are replaced by data URLs. Source PDFs remain linked to the publisher.
+    for p in sorted((SRC / "assets").rglob("*")):
+        if p.suffix not in (".svg", ".webp"):
+            continue
+        mime = "image/svg+xml" if p.suffix == ".svg" else "image/webp"
+        uri = "data:" + mime + ";base64," + base64.b64encode(p.read_bytes()).decode("ascii")
+        html = html.replace(p.relative_to(SRC).as_posix(), uri)
+    # Portrait paths are normally assembled at runtime; the artifact needs a map.
+    portraits = {p.stem.removesuffix("-portrait"): "data:image/webp;base64," + base64.b64encode(p.read_bytes()).decode("ascii")
+                 for p in (SRC / "assets/original").glob("*-portrait.webp")}
+    html = html.replace("/*ARTIFACT_PORTRAITS*/", "D.artifactPortraits = " + json.dumps(portraits) + ";")
+    out.write_text(html, encoding="utf-8")
     print(f"dist/artifact.html gebaut ({out.stat().st_size // 1024} KB)")
     return out
 

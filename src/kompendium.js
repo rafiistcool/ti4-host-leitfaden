@@ -19,16 +19,7 @@
   var PQ = { G: "Biotechnik", Y: "Kybernetik", B: "Antriebstechnik", R: "Kriegsführung" };
   var PHASE = { Status: "Statusphase", Aktion: "Aktionsphase", Agenda: "Agendaphase" };
   var COMPLEX = { 1: "einfach", 2: "mittel", 3: "anspruchsvoll" };
-  var ULTIMATE = {
-    arborec: "TheArborec", creuss: "TheGhostsOfCreuss", hacan: "TheEmiratesOfHacan", jolnar: "TheUniversitiesOfJolNar", l1z1x: "TheL1z1xMindnet",
-    letnev: "TheBaronyOfLetnev", mentak: "TheMentakCoalition", muaat: "TheEmbersOfMuaat", naalu: "TheNaaluCollective", nekro: "TheNekroVirus",
-    saar: "TheClanOfSaar", sardakk: "SardakkNorr", sol: "TheFederationOfSol", winnu: "TheWinnu", xxcha: "TheXxchaKingdom", yin: "TheYinBrotherhood",
-    yssaril: "TheYssarilTribes", argent: "TheArgentFlight", vuilraith: "TheVuilRaithCabal", empyrean: "TheEmpyrean", mahact: "TheMahactGeneSorcerers",
-    nomad: "TheNomad", naazrokha: "TheNaazRokhaAlliance", titans: "TheTitansOfUl", keleres: "TheCouncilKeleres"
-  };
-
   function nm(o) { return o.de || o.en; }
-  function sub(o) { return o.de && o.en && o.de !== o.en ? '<span class="en">' + esc(o.en) + "</span>" : ""; }
   function tag(t, cls) { return '<span class="tag' + (cls ? " " + cls : "") + '">' + esc(t) + "</span>"; }
   function srcTag(src) { return src && src !== "base" ? tag(SRC[src] || src, src) : ""; }
   function codexNote(c) { return c ? '<p class="codex"><b>Spätere Fassung</b> ' + md(c) + "</p>" : ""; }
@@ -53,7 +44,9 @@
     // o: {id, cls, kind, title, en, tags, body}
     return '<article class="kc' + (o.cls ? " " + o.cls : "") + '"' + (o.id ? ' id="' + o.id + '"' : "") + ">" +
       (o.kind ? '<p class="kind">' + o.kind + "</p>" : "") +
-      '<div class="kc-h"><h3>' + esc(o.title) + "</h3>" + (o.en ? '<span class="en">' + esc(o.en) + "</span>" : "") + (o.tags || "") + "</div>" +
+      '<div class="kc-h"><h3>' + esc(o.title) + "</h3>" + (o.tags || "") + "</div>" +
+      D.AssetUI.figure(o.id || o.assetKey, "card-image") +
+      D.AssetUI.related(o.id || o.assetKey) +
       (o.body || "") + "</article>";
   }
   function para(t) { return t ? "<p>" + md(t) + "</p>" : ""; }
@@ -98,14 +91,14 @@
           f.flagship.en, f.flagship.text, f.mech.en, f.mech.text, (f.units || []).map(function (x) { return [x.de, x.en, x.text].join(" "); }).join(" "),
           f.techs.map(function (t) { return [t.de, t.en, t.text].join(" "); }).join(" "), f.leaders.agents.map(function (a) { return [a.en, a.text].join(" "); }).join(" "),
           f.leaders.commander.en, f.leaders.commander.text, f.leaders.hero.en, f.leaders.hero.text, f.promissory.en, f.promissory.text]);
-        return '<a class="fcard kf-item" id="' + id + '" href="#f-' + f.id + '"><span class="thumb">' + hexThumb(f, 64) + "</span>" +
-          '<span class="body"><span class="nm">' + esc(nm(f)) + "</span>" + (f.de ? '<span class="en">' + esc(f.en) + "</span>" : "") +
+        return '<a class="fcard kf-item" id="' + id + '" href="#f-' + f.id + '"><span class="thumb">' + (D.AssetUI.portrait(f.id, nm(f)) || hexThumb(f, 64)) + "</span>" +
+          '<span class="body"><span class="nm">' + esc(nm(f)) + "</span>" +
           '<span class="meta">' + dots(f.complexity) + " " + esc(COMPLEX[f.complexity]) + "</span>" +
           '<span class="ds">' + esc(f.play) + "</span></span>" +
           '<span class="comm" title="Massenprodukte"><b>' + f.commodities + "</b></span></a>";
       }).join("") + "</div></section>";
     });
-    return h + emptyNote() + '<p class="fine">Deutsche Namen stehen da, wo die deutsche Ausgabe sie im Regelheft verwendet, sonst der englische Originalname. Bei Abweichungen gilt der Kartentext.</p>';
+    return h + emptyNote() + '<p class="fine">Originalporträts und Fraktionsreferenzen aus dem deutschen Codex II. Eigene Namensübersetzungen sind in den Referenzhilfen gekennzeichnet. Bei Abweichungen gilt der Kartentext.</p>';
   }
   function dots(n) { var s = ""; for (var i = 1; i <= 3; i++) s += '<i class="dot' + (i <= n ? " on" : "") + '"></i>'; return '<span class="cx" title="Komplexität ' + n + ' von 3">' + s + "</span>"; }
 
@@ -133,20 +126,21 @@
   function gcard(o) {
     // Karte aus dem Spielbereich: farbiges Band mit Art und Zustand, darunter Name und Text
     return '<article class="gcard' + (o.cls ? " " + o.cls : "") + '"><div class="band"><span>' + o.kind + "</span>" + (o.state ? '<span class="st">' + o.state + "</span>" : "") + "</div>" +
-      '<div class="gc-b"><div class="kc-h"><h3>' + esc(o.title) + "</h3>" + (o.en ? '<span class="en">' + esc(o.en) + "</span>" : "") + (o.tags || "") + "</div>" + (o.body || "") + "</div></article>";
+      '<div class="gc-b"><div class="kc-h"><h3>' + esc(o.title) + "</h3>" + (o.tags || "") + "</div>" + D.AssetUI.figure(o.assetKey, "card-image") + D.AssetUI.related(o.assetKey) + (o.body || "") + "</div></article>";
   }
 
   function viewFaction(id) {
     var f = facById[id];
     var back_ = sheetSide === "back";
-    var h = back("#fraktionen", "Fraktionen");
+    var displayedSheet = D.AssetUI.get("fs-" + f.id + "-" + sheetSide);
+    var h = back("#fraktionen", "Fraktionen") + "<h1>" + esc(nm(f)) + '</h1><p class="fine">' + esc(SRC_LONG[f.src]) + ' · Bilder antippen zum Vergrößern.</p>';
 
     // Vorderseite
     var front = '<header class="fs-head"><div class="fs-emblem">' + hexThumb(f, 96) + "</div>" +
-      '<div class="fs-title"><p class="fs-src">' + esc(SRC_LONG[f.src]) + "</p><h1>" + esc(nm(f)) + "</h1>" + (f.de ? '<p class="fs-en">' + esc(f.en) + "</p>" : "") + "</div>" +
+      '<div class="fs-title"><p class="fs-src">' + esc(SRC_LONG[f.src]) + "</p><h1>" + esc(nm(f)) + "</h1></div>" +
       '<div class="fs-comm" title="Massenprodukte"><b>' + f.commodities + "</b><span>Massen&shy;produkte</span></div></header>" +
       '<div class="fs-abil">' + f.abilities.map(function (a) {
-        return '<div class="fs-ab"><h3>' + esc(nm(a)) + (enIf(a) ? ' <span class="en">' + esc(enIf(a)) + "</span>" : "") + "</h3>" + para(a.text) + codexNote(a.codex) + "</div>";
+        return '<div class="fs-ab"><h3>' + esc(nm(a)) + "</h3>" + para(a.text) + codexNote(a.codex) + "</div>";
       }).join("") + "</div>" +
       '<div class="fs-flag"><div class="fs-flag-h"><div><p class="fs-lbl">Flaggschiff</p><h3>' + esc(nm(f.flagship)) + "</h3></div>" + statline(f.flagship) + "</div>" +
       para(f.flagship.text) + codexNote(f.flagship.codex) +
@@ -172,45 +166,45 @@
     h += '<div class="fs-bar" role="group" aria-label="Seite des Fraktionsbogens">' +
       '<button type="button" data-act="fs-side" data-side="front" aria-pressed="' + !back_ + '">Vorderseite</button>' +
       '<button type="button" data-act="fs-side" data-side="back" aria-pressed="' + back_ + '">Rückseite und Start</button></div>' +
+      '<section class="component-sheet" aria-label="Bogenabbildung">' + D.AssetUI.figure("fs-" + f.id + "-" + sheetSide, "sheet-image") + D.AssetUI.alternatives("fs-" + f.id + "-" + sheetSide) + '</section><details class="text-details"' + (displayedSheet && displayedSheet.language === "en" ? " open" : "") + '><summary>Deutsche Textfassung des Bogens</summary>' +
       '<div class="fsheet" id="fsheet" data-side="' + sheetSide + '"><div class="fs-inner">' +
       '<section class="fs-face fs-front" aria-label="Vorderseite"' + (back_ ? " inert" : "") + ">" + front + "</section>" +
       '<section class="fs-face fs-back" aria-label="Rückseite"' + (back_ ? "" : " inert") + ">" + backSide + "</section>" +
-      "</div></div>";
+      "</div></div></details>";
     h += '<p class="fs-play">' + esc(f.play) + "</p>";
 
     // Spielbereich
     var L = f.leaders, lead = [];
     var lockSt = '<i class="lock" aria-hidden="true"></i>gesperrt';
-    L.agents.forEach(function (a) {
-      lead.push(gcard({ cls: "leader agent", kind: "Agent" + (a.title ? ", " + esc(a.title) : ""), state: '<i class="ready" aria-hidden="true"></i>spielbereit', title: nm(a), en: enIf(a), body: para(a.text) + codexNote(a.codex) }));
+    L.agents.forEach(function (a, i) {
+      lead.push(gcard({ assetKey: "f-agent-" + f.id + "-" + i, cls: "leader agent", kind: "Agent" + (a.title ? ", " + esc(a.title) : ""), state: '<i class="ready" aria-hidden="true"></i>spielbereit', title: nm(a), en: enIf(a), body: para(a.text) + codexNote(a.codex) }));
     });
-    lead.push(gcard({ cls: "leader", kind: "Commander", state: lockSt, title: nm(L.commander), en: enIf(L.commander),
+    lead.push(gcard({ assetKey: "f-commander-" + f.id, cls: "leader", kind: "Kommandeur", state: lockSt, title: nm(L.commander), en: enIf(L.commander),
       body: '<p class="unlock"><b>Freischalten:</b> ' + md(L.commander.unlock || "") + "</p>" + para(L.commander.text) + codexNote(L.commander.codex) }));
-    lead.push(gcard({ cls: "leader hero", kind: "Held", state: lockSt, title: nm(L.hero), en: enIf(L.hero),
+    lead.push(gcard({ assetKey: "f-hero-" + f.id, cls: "leader hero", kind: "Held", state: lockSt, title: nm(L.hero), en: enIf(L.hero),
       body: '<p class="unlock"><b>Freischalten:</b> 3 gewertete Aufträge. Nach Gebrauch vernichtet.</p>' + para(L.hero.text) + codexNote(L.hero.codex) }));
 
-    var units = [gcard({ cls: "unit", kind: "Mech", state: "Kosten " + esc(f.mech.cost), title: nm(f.mech), en: enIf(f.mech), body: statline(f.mech) + para(f.mech.text) + codexNote(f.mech.codex) })];
-    (f.units || []).forEach(function (x) {
-      units.push(gcard({ cls: "unit", kind: "Statt " + esc(x.replaces), title: nm(x), en: enIf(x), body: statline(x) + para(x.text) + codexNote(x.codex) + upgrade(x.upgrade) }));
+    var units = [gcard({ assetKey: "f-mech-" + f.id, cls: "unit", kind: "Mech", state: "Kosten " + esc(f.mech.cost), title: nm(f.mech), en: enIf(f.mech), body: statline(f.mech) + para(f.mech.text) + codexNote(f.mech.codex) })];
+    (f.units || []).forEach(function (x, i) {
+      units.push(gcard({ assetKey: "f-unit-" + f.id + "-" + i, cls: "unit", kind: "Statt " + esc(x.replaces), title: nm(x), en: enIf(x), body: statline(x) + para(x.text) + codexNote(x.codex) + upgrade(x.upgrade) }));
     });
 
     h += '<section class="playarea" aria-label="Spielbereich"><h2>Spielbereich</h2>' +
       '<p class="fine">Was neben dem Bogen liegt: Anführerbogen, Mech und Sondereinheiten, die zwei Fraktionstechnologien und die eigene Vertragskarte.</p>' +
       '<h3 class="pa-h">Anführer</h3><div class="pa-row leaders">' + lead.join("") + "</div>" +
       '<h3 class="pa-h">Einheiten</h3><div class="pa-row">' + units.join("") + "</div>" +
-      '<h3 class="pa-h">Fraktionstechnologien</h3><div class="pa-row">' + f.techs.map(function (t) {
-        return gcard({ cls: "techc c-" + t.color, kind: esc(COLOR[t.color] || t.color), state: prereq(t.prereq), title: nm(t), en: enIf(t), body: para(t.text) + codexNote(t.codex) });
+      '<h3 class="pa-h">Fraktionstechnologien</h3><div class="pa-row">' + f.techs.map(function (t, i) {
+        return gcard({ assetKey: "ftech-" + f.id + "-" + i, cls: "techc c-" + t.color, kind: esc(COLOR[t.color] || t.color), state: prereq(t.prereq), title: nm(t), en: enIf(t), body: para(t.text) + codexNote(t.codex) });
       }).join("") + "</div>" +
       '<h3 class="pa-h">Vertragskarte</h3><div class="pa-row">' +
-      gcard({ cls: "prom", kind: "Vertrag", state: "nur für andere Spieler", title: nm(f.promissory), en: enIf(f.promissory), body: para(f.promissory.text) + codexNote(f.promissory.codex) }) +
+      gcard({ assetKey: "f-promissory-" + f.id, cls: "prom", kind: "Vertrag", state: "nur für andere Spieler", title: nm(f.promissory), en: enIf(f.promissory), body: para(f.promissory.text) + codexNote(f.promissory.codex) }) +
       "</div></section>";
 
-    // Originale
-    var ult = ULTIMATE[f.id];
-    h += '<div class="card origs"><h3>Originalkarten ansehen</h3><p>Die echten Bögen und Karten sind urheberrechtlich geschützt und deshalb hier nachgebaut statt abgebildet.</p><div class="links">' +
-      (ult ? '<a class="btn" href="https://ti4ultimate.com/game/factions?faction=' + ult + '" target="_blank" rel="noopener">' + U().svg("ext", 18) + "TI4 Ultimate</a>" : "") +
-      '<a class="btn" href="https://twilight-imperium.fandom.com/wiki/Special:Search?query=' + encodeURIComponent(f.en) + '" target="_blank" rel="noopener">' + U().svg("ext", 18) + "Twilight Imperium Wiki</a></div>" +
-      '<p class="fine">Beide Seiten sind englisch.</p></div>';
+    // Original reference is separately labeled: it is not the faction sheet.
+    h += '<section class="card origs"><h2>Originalmaterial zur Fraktion</h2>' +
+      (D.AssetUI.get("ref-" + f.id) ? '<p>Deutsche Kurzreferenz aus Codex II. Sie enthält teilweise optionale Ω-Fassungen und ist kein vollständiger Fraktionsbogen.</p>' + D.AssetUI.figure("ref-" + f.id, "sheet-image") : '<p>Der vollständige deutsche Keleres-Bogen stammt aus Codex III.</p>') +
+      '<div class="asset-extras">' + D.AssetUI.factionExtras(f.id) + '</div>' +
+      '<a class="btn" href="#originalmaterial">Alle Originalabbildungen</a></section>';
 
     // Blättern
     var order = FAC.slice().sort(function (a, b) { return a.short.localeCompare(b.short, "de"); });
@@ -373,11 +367,8 @@
     click: function (a, t) {
       if (a === "fs-side") {
         sheetSide = t.getAttribute("data-side");
-        var sh = document.getElementById("fsheet"); if (!sh) return true;
-        sh.setAttribute("data-side", sheetSide);
-        sh.querySelector(".fs-front").inert = sheetSide === "back";
-        sh.querySelector(".fs-back").inert = sheetSide !== "back";
-        document.querySelectorAll('[data-act="fs-side"]').forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-side") === sheetSide)); });
+        U().rerender();
+        var selected = document.querySelector('[data-act="fs-side"][data-side="' + sheetSide + '"]'); if (selected) selected.focus();
         return true;
       }
       if (a === "agenda-all") { agendaAll = t.getAttribute("data-v") === "1"; U().rerender(); return true; }

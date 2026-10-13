@@ -219,6 +219,7 @@
       hubLink("#fraktionen", "faction", "Fraktionen", "Alle " + (D.factions || []).length + " Fraktionen mit Fähigkeiten, Einheiten, Anführern und Heimat-System.") +
       hubLink("#technologien", "tech", "Technologien", "Alle allgemeinen Technologien nach Farbe, dazu die Fraktionstechnologien.") +
       hubLink("#karten", "cards", "Karten", "Aktionskarten, Agenden, Aufträge, Relikte und Erkundungskarten.") +
+      hubLink("#originalmaterial", "cards", "Originalmaterial", "Originalkarten und Bögen, deutsch bevorzugt, mit Vergrößerung und Quellen.") +
       hubLink("#generator", "map", "Kartengenerator", "Zufällige, ausgewogene Galaxie für 3 bis 8 Spieler.") + "</div>" +
       '<p class="section-k">Partie</p><div class="list-links">' +
       '<button type="button" data-act="new-game" class="' + (resetArmed ? "danger" : "") + '">' + svg("reset", 20) + "<span>" + (resetArmed ? "Wirklich? Noch einmal tippen zum Zurücksetzen" : "Neue Partie starten (Runde 1, alles zurücksetzen)") + "</span></button>" +
@@ -234,6 +235,7 @@
     var t = topicById[id];
     var h = (route.tab === "kampf" ? "" : '<a class="back" href="#nachschlagen">' + svg("back", 18) + "Nachschlagen</a>") +
       "<h1>" + esc(t.name) + "</h1>" + '<p class="lead">' + esc(t.desc) + "</p>" + blocks(t.blocks);
+    if (id === "sc") h += '<section class="card"><h2>Originalkarte: Diplomatie</h2><p>Korrigierte deutsche Karte aus den offiziellen Errata vom 18.05.2021.</p>' + D.AssetUI.figure("strategy-diplomacy", "sheet-image") + '</section>';
     return h;
   }
 
@@ -383,8 +385,8 @@
       '<li>Zum Gegenlesen: <a href="https://www.tirules.com" target="_blank" rel="noopener">tirules.com</a> (englische Rules Reference mit Klarstellungen) und das <a href="https://twilight-imperium.fandom.com" target="_blank" rel="noopener">Twilight Imperium Wiki</a>.</li>' +
       '<li>Werte von Systemtafeln, Fraktionen und Karten: Daten des Discord-Bots <a href="https://github.com/AsyncTI4/TI4_map_generator_bot" target="_blank" rel="noopener">AsyncTI4</a> (gemeinfrei, Unlicense) und des Kartengenerators <a href="https://github.com/KeeganW/ti4" target="_blank" rel="noopener">KeeganW/ti4</a>, gegeneinander abgeglichen. Positionen der Spielplan-Zusammensetzungen nach Seite 6 der Living Rules Reference.</li></ul></div>' +
       '<div class="card credits"><h3>Bilder und Kartentexte</h3>' +
-      "<p>Die Systemtafeln im Aufbau und im Kartengenerator sind selbst gezeichnet: Planeten, Werte, Wurmlöcher und Anomalien kommen aus den Spieldaten, die Grafik ist ein eigener, schlichter Stil. Originalgrafiken, Kartenbilder und Scans von Fantasy Flight Games sind bewusst nicht eingebunden.</p>" +
-      "<p>Karten-, Fraktions- und Technologietexte sind sinngemäße Zusammenfassungen. Deutsche Namen stehen da, wo die deutsche Living Rules Reference sie verwendet, sonst der englische Originalname. Der Kartengenerator ist ein Hilfsmittel, kein offizielles Werkzeug.</p></div>" +
+      '<p>Deutsche Originalabbildungen von Karten und Bögen stammen aus den öffentlich angebotenen Asmodee-Downloads. Fehlende deutsche Bögen werden mit englischen Originalabbildungen über den Community-Spiegel TI4 Ultimate ergänzt. Deutsche Originale werden bevorzugt; Erläuterungen bleiben deutsch. Jede Abbildung nennt Sprache, Edition und Quelle. Die Rechte bleiben bei Fantasy Flight Games und Asmodee. <a href="#originalmaterial">Material und Quellen ansehen</a>.</p>' +
+      "<p>Fehlende Originalbilder sind als eigene Referenzhilfen mit sinngemäßen Texten dargestellt. Eigene Namensübersetzungen sind gekennzeichnet. Eine vollständige Wort-für-Wort-Prüfung aller deutschen Boxkarten ist ohne deren Originale nicht möglich. Systemtafeln im Kartengenerator sind weiterhin selbst gezeichnet.</p></div>" +
       '<div class="card credits"><h3>Gemacht von</h3>' +
       '<p>Zusammengestellt von Rafael Till (<a href="https://github.com/rafiistcool" target="_blank" rel="noopener">@rafiistcool</a>) mit Unterstützung von Claude (Anthropic).</p>' +
       "<p>Schriften: Saira Condensed, Source Sans 3 und IBM Plex Mono (SIL Open Font License). In der installierten App werden sie mitgeliefert, damit alles offline funktioniert.</p>" +
@@ -446,6 +448,7 @@
       railLink("#fraktionen", "faction", "Fraktionen", route.rail === "fraktionen") +
       railLink("#technologien", "tech", "Technologien", route.rail === "technologien") +
       railLink("#karten", "cards", "Karten", route.rail === "karten") +
+      railLink("#originalmaterial", "cards", "Originalmaterial", route.rail === "originalmaterial") +
       "</nav>" +
       '<a class="rail-foot' + (route.v === "credits" ? " cur" : "") + '" href="#credits">' + svg("info", 16) + "Über und Credits</a>";
   }

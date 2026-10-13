@@ -7,6 +7,7 @@ Host-Begleiter für **Twilight Imperium: Vierte Edition** mit **Prophezeiung der
 - **Aufbau**: Spielplan-Schema für 3 bis 8 Spieler mit allen offiziellen Varianten (Hyperrouten, große Galaxie, Alternativen), Tafeln pro Spieler, Legereihenfolge und der komplette Aufbau als Checkliste.
 - **Kartengenerator**: würfelt eine Galaxie mit gezeichneten Systemtafeln, hält Anomalien und gleiche Wurmlöcher auseinander und gleicht die Plätze aus. Dazu Ausgleichstabelle, Liste der Tafeln zum Heraussuchen, Kartencode und teilbarer Link (gleiche Kartennummer ergibt dieselbe Karte).
 - **Kompendium**: alle 25 Fraktionen (Grundspiel, PoK, Council Keleres) mit Fähigkeiten, Einheiten, Technologien, Anführern und Vertragskarte, alle Technologien sowie Aktionskarten, Agenden, Aufträge, Relikte und Erkundungskarten, filterbar.
+- **Materialbilder**: 110 deutsche Originalabbildungen aus den Asmodee-PDFs und 48 englische Originalbögen für die 24 Grundspiel-/PoK-Fraktionen über TI4 Ultimate. Deutsche Originale werden bevorzugt; deutsche Textfassungen und Kurzreferenzen bleiben verfügbar. Jede Abbildung nennt Sprache, Edition und Quelle und lässt sich vergrößern. Weitere fehlende Bilder werden durch beschriftete deutsche SVG-Referenzhilfen ergänzt.
 - **Nachschlagen**: Themen (Taktikaktion, „Wann darf ich…?“, Handel, Strategiekarten, Limits und Einheitenwerte, PoK-Neuerungen, Aufbau) und eine **Regelreferenz A–Z** mit allen 101 Einträgen der Living Rules Reference 2.0, in eigenen Worten und mit den Absatznummern des offiziellen deutschen Regelhefts.
 - **Suche** über Ablauf, Themen, Regeln, Fraktionen und Karten. Umlaute gehen auch als ae/oe/ue, englische Begriffe werden mitgefunden.
 - **Offline**: Nach dem ersten Öffnen funktioniert alles ohne Netz, Schriften und Icons werden mitgeliefert.
@@ -72,6 +73,12 @@ src/
   map.js                Spielplan-Geometrie, gezeichnete Systemtafeln, Generator
   aufbau.js             Ansichten Aufbau und Kartengenerator
   kompendium.js         Ansichten Fraktionen, Technologien, Karten
+  assets.js             Originalmaterial, Quellen, Bildvergrößerung
+  assets/               lokale Originalausschnitte und SVG-Referenzhilfen
+  data/de-namen.js      deutsche Anzeigenamen mit Herkunftskennzeichnung
+  data/original-assets.js Originalmanifest mit Quelle, Edition, PDF-Seite, Prüfsumme
+  data/english-sheets.js englische Originalbögen, Sprache und Community-Herkunft
+  data/reference-assets.js Referenzbilder für das Kompendium
   data/ablauf.js        Schritte der vier Phasen
   data/themen.js        Themen-Seiten fürs Nachschlagen
   data/regeln-1.js      Regelreferenz Nr. 1–50
@@ -103,6 +110,18 @@ Inoffizielles Fan-Hilfsmittel. Twilight Imperium und Prophezeiung der Könige si
 
 Alle Regeltexte sind eigene Zusammenfassungen auf Grundlage der Living Rules Reference 2.0 (deutsch, 25.01.2021) inklusive Errata und FAQ. Bei Abweichungen gelten Kartentext und offizielle Regeln.
 
-Werte von Systemtafeln, Fraktionen und Karten stammen aus den Daten von [AsyncTI4](https://github.com/AsyncTI4/TI4_map_generator_bot) (Unlicense) und [KeeganW/ti4](https://github.com/KeeganW/ti4), gegeneinander abgeglichen. Kartentexte sind sinngemäß zusammengefasst, deutsche Namen nur dort, wo die deutsche LRR sie belegt. Die Systemtafeln sind selbst gezeichnet, Originalgrafiken von Fantasy Flight Games sind nicht enthalten.
+Werte von Systemtafeln, Fraktionen und Karten stammen aus den Daten von [AsyncTI4](https://github.com/AsyncTI4/TI4_map_generator_bot) (Unlicense) und [KeeganW/ti4](https://github.com/KeeganW/ti4). Kartentexte sind sinngemäß zusammengefasst. Die Systemtafeln des Kartengenerators sind selbst gezeichnet.
+
+Deutsche Originalabbildungen stammen aus den öffentlich angebotenen Downloads auf den [Asmodee-Grundspiel](https://www.asmodee.de/produkte/twilight-imperium-4-edition)- und [PoK-Produktseiten](https://www.asmodee.de/produkte/twilight-imperium-4-edition-prophezeiung-der-koenige). Die Rechte verbleiben bei Fantasy Flight Games und Asmodee; es wird keine freie Bildlizenz behauptet. Das Manifest in `src/assets/original/manifest.json` enthält direkte PDF-Links, Seiten, Zuschnitte, Drehung, Edition und Prüfsummen.
+
+Ein vollständiger deutscher Scan aller Boxkarten und Fraktionsbögen war nicht auffindbar. Für die fehlenden deutschen Bögen sind englische Vorder- und Rückseiten der 24 Grundspiel-/PoK-Fraktionen eingebunden, über den Community-Spiegel [TI4 Ultimate](https://ti4ultimate.com/game/factions), anhand [AsyncTI4](https://github.com/AsyncTI4/TI4_map_generator_bot/tree/e06e41074e1bcc1e636331f40a55fa1643802852/src/main/resources/data/factions) zugeordnet und byteidentisch übernommen. Keleres bleibt vollständig deutsch; beim Xxcha-Bogen steht die deutsche Regelheftabbildung zuerst, die englische hohe Auflösung als Alternative. Deutsche Textfassungen öffnen sich bei englischen Bögen automatisch. Fehlende weitere Bilder bleiben eigene SVG-Referenzhilfen, dauerhaft mit **„REFERENZHILFE · SINNGEMÄSS“** markiert. Deutsche Namen stammen aus belegten Originalen, bisherigen Daten oder einer gekennzeichneten eigenen Übersetzung. Codex-Ω-Fassungen sind optional. Der [Assetreview](docs/asset-review.md) dokumentiert Prüfungen und Grenzen.
+
+Die Bilder liegen lokal und werden vom Service Worker zusammen mit der App zwischengespeichert (gesamte Website rund 34 MB). Vollständige Original-PDFs und externe Originalbildquellen benötigen Netz. `python3 build.py --artifact` bettet die Bilddateien in den Ein-Datei-Export ein.
+
+Zum Aktualisieren der Assets: `node scripts/generate_reference_assets.mjs` erzeugt Referenzhilfen aus den Spieldaten. `scripts/import_original_assets.py <PDF-Ordner>` extrahiert die festgelegten Originalausschnitte; benötigt Poppler, Pillow und pdfplumber. Die erwarteten Dateinamen und offiziellen Quellen stehen im Skript. Nach Datenänderungen zuerst Referenzbilder neu erzeugen, dann `python3 build.py` ausführen.
+
+`node scripts/import_english_sheets.mjs <Download-Ordner>` importiert die englischen Bögen anhand des geprüften Download-Manifests. Die getrennten Manifeste in `src/assets/original/` und `src/assets/english-sheets/` bewahren Sprache, Zuordnung und Prüfsummen. Im Runtime-Katalog werden beide zusammengeführt.
+
+`node scripts/check_assets.mjs` prüft nach dem Build Referenzabdeckung, deutsche Namen, Quellen, Original-Prüfsummen, Zielschlüssel, Ω-Trennung und Offline-Pfade.
 
 Zusammengestellt von Rafael Till ([@rafiistcool](https://github.com/rafiistcool)) mit Unterstützung von Claude (Anthropic). Schriften: Saira Condensed, Source Sans 3, IBM Plex Mono, SIL Open Font License 1.1 (siehe `src/fonts/LICENSE-FONTS.txt`).

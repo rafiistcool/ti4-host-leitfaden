@@ -33,7 +33,8 @@ TI4.factions = [
       text: "Aktiviert ein anderer Spieler ein System mit mindestens 1 deiner Einheiten mit Produktion, darfst du dort anschließend 1 Einheit produzieren." },
     hero: { en: "Letani Miasmiala", text: "Materialaktion: Produziere beliebig viele Einheiten in beliebig vielen Systemen, in denen mindestens 1 deiner Bodentruppen steht. Danach wird die Karte vernichtet." }
   },
-  promissory: { en: "Stymie", text: "Nachdem ein anderer Spieler Schiffe in ein System mit deinen Einheiten bewegt hat, darfst du einen Kommandomarker aus seinem Nachschub in ein beliebiges Nicht-Heimat-System legen. Danach geht die Karte an den Arborec-Spieler zurück." },
+  promissory: { de: "Wachstumshemmer", en: "Stymie", text: "Materialaktion: Lege die Karte offen in deinen Spielbereich. Der Arborec-Spieler darf keine Einheiten in oder angrenzend an Nicht-Heimat-Systeme produzieren, die mindestens 1 deiner Einheiten enthalten. Aktivierst du ein System mit Arborec-Einheiten, geht die Karte an ihn zurück.",
+    codex: "Codex I (Ω): Nachdem ein anderer Spieler Schiffe in ein System mit deinen Einheiten bewegt hat, darfst du einen Kommandomarker aus seinem Nachschub in ein beliebiges Nicht-Heimat-System legen. Danach geht die Karte an den Arborec-Spieler zurück." },
   play: "Wächst langsam, aber stetig, weil Infanterie und Flaggschiff fast überall dort produzieren, wo Bodentruppen stehen."
 },
 
@@ -97,7 +98,7 @@ TI4.factions = [
   play: "Handelsmacht, die über Massenprodukte, Transaktionen und die Strategiekarte Handel Ressourcen und Einfluss in Bewegung hält."
 },
 
-{ id: "jolnar", en: "The Universities of Jol-Nar", src: "base", short: "Jol-Nar",
+{ id: "jolnar", de: "Die Universitäten von Jol-Nar", en: "The Universities of Jol-Nar", src: "base", short: "Jol-Nar",
   complexity: 1, commodities: 4, homeTile: "12",
   home: [{ name: "Jol", res: 1, inf: 2 }, { name: "Nar", res: 2, inf: 3 }],
   start: { units: "1 Schlachtschiff, 2 Träger, 1 Jäger, 2 Infanterie, 2 PVS, 1 Raumwerft", tech: ["Antimass Deflectors", "Sarween-Werkzeuge", "Neurostimulator", "Plasmabrenner"] },
@@ -126,7 +127,7 @@ TI4.factions = [
   play: "Technologieführer, der früh viele Karten sammelt, im direkten Kampf aber mit schlechteren Würfeln antritt."
 },
 
-{ id: "l1z1x", en: "The L1Z1X Mindnet", src: "base", short: "L1Z1X",
+{ id: "l1z1x", de: "Das L1Z1X-Gedankennetz", en: "The L1Z1X Mindnet", src: "base", short: "L1Z1X",
   complexity: 1, commodities: 2, homeTile: "6",
   home: [{ name: "[0.0.0]", res: 5, inf: 0 }],
   start: { units: "1 Schlachtschiff, 1 Träger, 3 Jäger, 5 Infanterie, 1 PVS, 1 Raumwerft", tech: ["Plasmabrenner", "Neurostimulator"] },
@@ -156,7 +157,8 @@ TI4.factions = [
       text: "Einheiten mit Planetarer Schild hindern dich nicht daran, Bombardement einzusetzen." },
     hero: { en: "The Helmsman", text: "Materialaktion: Wähle 1 System ohne fremde Schiffe und bewege dein Flaggschiff sowie beliebig viele Schlachtschiffe aus anderen Systemen dorthin. Danach wird die Karte vernichtet." }
   },
-  promissory: { en: "Cybernetic Enhancements", text: "Wenn du in der Statusphase Kommandomarker erhältst, bekommst du 1 zusätzlichen. Danach geht die Karte an den L1Z1X-Spieler zurück." },
+  promissory: { de: "Kybernetische Implantate", en: "Cybernetic Enhancements", text: "Zu Beginn deines Zuges legst du 1 Marker aus dem Strategiepool des L1Z1X-Spielers in dessen Nachschub zurück und legst anschließend 1 Kommandomarker aus deinem Nachschub in deinen Strategiepool. Danach geht die Karte an den L1Z1X-Spieler zurück.",
+    codex: "Codex I (Ω): Wenn du in der Statusphase Kommandomarker erhältst, bekommst du 1 zusätzlichen. Danach geht die Karte an den L1Z1X-Spieler zurück." },
   play: "Militärische Walze mit starken Schlachtschiffen, die eroberte Planeten samt Gebäuden übernimmt."
 },
 
@@ -184,7 +186,8 @@ TI4.factions = [
       text: "Nachdem eine deiner Einheiten Schadensresistenz genutzt hat, darfst du 1 Handelsware erhalten." },
     hero: { en: "Darktalon Treilla", text: "Materialaktion: Lege die Karte neben den Spielplan. Bis zum Ende dieser Spielrunde begrenzen weder Gesetze noch dein Flottenpool die Zahl deiner Nicht-Jäger-Schiffe pro System. Am Ende der Runde wird die Karte vernichtet." }
   },
-  promissory: { en: "War Funding", text: "Nachdem du und dein Gegner im Raumkampf gewürfelt habt, darfst du alle Würfel des Gegners und beliebige eigene Würfel erneut werfen. Danach geht die Karte an den Letnev-Spieler zurück." },
+  promissory: { de: "Zuschuss für die Kriegskasse", en: "War Funding", text: "Zu Beginn einer Raumkampfrunde verliert der Letnev-Spieler 2 Handelswaren. Während dieser Kampfrunde darfst du beliebig viele deiner Würfel erneut werfen. Danach geht die Karte an den Letnev-Spieler zurück.",
+    codex: "Codex I (Ω): Nachdem du und dein Gegner im Raumkampf gewürfelt habt, darfst du alle Würfel des Gegners und beliebige eigene Würfel erneut werfen. Danach geht die Karte an den Letnev-Spieler zurück." },
   play: "Robuste Flottenfraktion, die mit vielen Schiffen pro System und Handelswaren für Wiederholungswürfe Raumkämpfe dominiert."
 },
 
@@ -237,7 +240,7 @@ TI4.factions = [
   techs: [
     { de: "Kriegssonne-Prototyp II", en: "Prototype War Sun II", color: "einheit", prereq: "RRRY",
       text: "Aufwertung deiner Kriegssonnen auf Kosten 10 und Bewegung 3." },
-    { en: "Magmus Reactor", color: "rot", prereq: "RR",
+    { de: "Magmus-Reaktor", en: "Magmus Reactor", color: "rot", prereq: "RR",
       text: "Deine Schiffe dürfen in Supernovae einfliegen. Nachdem deine Einheiten Produktion in einem System mit Kriegssonne oder angrenzend an eine Supernova genutzt haben, erhältst du 1 Handelsware.",
       codex: "Codex I (Ω): Statt der Handelsware hat jede Supernova mit mindestens 1 deiner Einheiten Produktion 5, als wäre sie eine deiner Einheiten." }
   ],
@@ -291,7 +294,7 @@ TI4.factions = [
 { id: "nekro", de: "Das Nekro-Virus", en: "The Nekro Virus", src: "base", short: "Nekro",
   complexity: 3, commodities: 3, homeTile: "8",
   home: [{ name: "Mordai II", res: 4, inf: 0 }],
-  start: { units: "1 Schlachtschiff, 1 Träger, 1 Kreuzer, 2 Jäger, 2 Infanterie, 1 Raumwerft", tech: ["Dacxive Animatoren"] },
+  start: { units: "1 Schlachtschiff, 1 Träger, 1 Kreuzer, 2 Jäger, 2 Infanterie, 1 Raumwerft", tech: ["Dacxive Animatoren", "Valefar-Assimilator X", "Valefar-Assimilator Y"] },
   abilities: [
     { en: "Galactic Threat", text: "Du darfst nicht über Agenden abstimmen. Einmal pro Agendaphase darfst du nach dem Aufdecken einer Agenda eine Prognose zum Ergebnis abgeben und erhältst bei einem Treffer 1 Technologie eines Spielers, der so abgestimmt hat." },
     { en: "Technological Singularity", text: "Einmal pro Kampf darfst du, nachdem eine gegnerische Einheit zerstört wurde, 1 Technologie dieses Gegners erhalten." },
@@ -351,7 +354,7 @@ TI4.factions = [
   play: "Heimatlose Plünderer, die mit beweglichen Schwebefabriken dorthin ziehen, wo gerade Beute lockt."
 },
 
-{ id: "sardakk", en: "Sardakk N'orr", src: "base", short: "Sardakk",
+{ id: "sardakk", de: "Die Sardakk N’orr", en: "Sardakk N'orr", src: "base", short: "Sardakk",
   complexity: 2, commodities: 3, homeTile: "13",
   home: [{ name: "Quinarra", res: 3, inf: 1 }, { name: "Tren'lak", res: 1, inf: 0 }],
   start: { units: "2 Träger, 1 Kreuzer, 5 Infanterie, 1 PVS, 1 Raumwerft", tech: [] },
@@ -384,7 +387,7 @@ TI4.factions = [
   play: "Aggressive Kriegerfraktion ohne Starttechnologie, deren Bonus auf alle Kampfwürfe frühe Angriffe lohnend macht."
 },
 
-{ id: "sol", en: "The Federation of Sol", src: "base", short: "Sol",
+{ id: "sol", de: "Die Sol-Föderation", en: "The Federation of Sol", src: "base", short: "Sol",
   complexity: 1, commodities: 4, homeTile: "1",
   home: [{ name: "Jord", res: 4, inf: 2 }],
   start: { units: "2 Träger, 1 Zerstörer, 3 Jäger, 5 Infanterie, 1 Raumwerft", tech: ["Antimass Deflectors", "Neurostimulator"] },
@@ -438,7 +441,7 @@ TI4.factions = [
     { de: "Lazaxianische Raumfaltung", en: "Lazax Gate Folding", color: "blau", prereq: "BB",
       text: "Kontrollierst du Mecatol Rex nicht, gilt sein System während deiner Taktikaktionen so, als hätte es ein Alpha- und ein Beta-Wurmloch. Kontrollierst du ihn, darfst du per Materialaktion die Karte erschöpfen und 1 Infanterie aus deinem Nachschub auf Mecatol Rex setzen." },
     { de: "Hegemoniale Handelsstrategie", en: "Hegemonic Trade Policy", color: "gelb", prereq: "YY",
-      text: "Nutzen deine Einheiten Produktion, darfst du die Karte erschöpfen und für diese Produktion den Ressourcen- und den Einflusswert eines deiner Planeten vertauschen." }
+      text: "Nutzen deine Einheiten Produktion, darfst du die Karte erschöpfen. Während dieser Produktion vertauschst du bis zum Ende deines Zuges den Ressourcen- und den Einflusswert eines Planeten, den du kontrollierst." }
   ],
   leaders: {
     agents: [{ en: "Berekar Berekon", text: "Wenn Einheiten eines Spielers Produktion nutzen, darfst du die Karte erschöpfen, um die Gesamtkosten der produzierten Einheiten um 2 zu senken." }],
@@ -446,7 +449,8 @@ TI4.factions = [
       text: "Im Kampf erhalten deine Einheiten +2 auf ihre Kampfwürfe im Mecatol-Rex-System, in deinem Heimat-System und in jedem System mit einem legendären Planeten." },
     hero: { en: "Mathis Mathinus", text: "Materialaktion: Handle die Primärfähigkeit einer beliebigen Strategiekarte ab. Danach dürfen beliebige andere Spieler deiner Wahl deren Sekundärfähigkeit abhandeln, und die Karte wird vernichtet." }
   },
-  promissory: { en: "Acquiescence", text: "Handelt der Winnu-Spieler eine Strategieaktion ab, musst du für deren Sekundärfähigkeit keinen Kommandomarker ausgeben oder platzieren. Danach geht die Karte an ihn zurück." },
+  promissory: { de: "Duldung", en: "Acquiescence", text: "Am Ende der Strategiephase tauschst du 1 deiner Strategiekarten gegen 1 Strategiekarte, die der Winnu-Spieler gewählt hat. Danach geht die Karte an ihn zurück.",
+    codex: "Codex I (Ω): Handelt der Winnu-Spieler eine Strategieaktion ab, musst du für deren Sekundärfähigkeit keinen Kommandomarker ausgeben oder platzieren. Danach geht die Karte an ihn zurück." },
   play: "Politische Fraktion mit Blick auf Mecatol Rex, die vom Zentrum aus Einfluss und Punkte sammelt."
 },
 
@@ -479,7 +483,7 @@ TI4.factions = [
   play: "Defensive Diplomaten, die sich mit Weltraumkanonen schützen und die Agendaphase lenken."
 },
 
-{ id: "yin", en: "The Yin Brotherhood", src: "base", short: "Yin",
+{ id: "yin", de: "Die Yin-Bruderschaft", en: "The Yin Brotherhood", src: "base", short: "Yin",
   complexity: 1, commodities: 2, homeTile: "3",
   home: [{ name: "Darien", res: 4, inf: 4 }],
   start: { units: "2 Träger, 1 Zerstörer, 4 Jäger, 4 Infanterie, 1 Raumwerft", tech: ["Sarween-Werkzeuge"] },
@@ -492,26 +496,27 @@ TI4.factions = [
   mech: { en: "Moyin's Ashes", cost: 2, combat: "6",
     text: "Schadensresistenz. Einsatz: Nutzt du Indoctrination, darfst du 1 weiteren Einfluss ausgeben, um die gegnerische Einheit durch 1 Mech statt durch Infanterie zu ersetzen." },
   techs: [
-    { en: "Yin Spinner", color: "gruen", prereq: "GG",
+    { de: "Yin-Zentrifuge", en: "Yin Spinner", color: "gruen", prereq: "GG",
       text: "Nachdem 1 oder mehrere deiner Einheiten Produktion genutzt haben, setzt du 1 Infanterie aus deinem Nachschub auf einen deiner Planeten in diesem System.",
-      codex: "Codex I (Ω): Nach dem Produzieren setzt du bis zu 2 Infanterie auf beliebige eigene Planeten oder in Weltraumbereiche mit mindestens 1 deiner Schiffe." },
+      codex: "Codex I (Ω): Nach dem Produzieren setzt du bis zu 2 Infanterie auf 1 beliebigen eigenen Planeten oder in 1 beliebigen Weltraumbereich mit mindestens 1 deiner Schiffe." },
     { en: "Impulse Core", color: "gelb", prereq: "YY",
       text: "Zu Beginn eines Raumkampfs darfst du 1 deiner Kreuzer oder Zerstörer im aktiven System zerstören, um 1 Treffer zu erzeugen. Der Gegner muss ihn nach Möglichkeit einem Nicht-Jäger-Schiff zuweisen." }
   ],
   leaders: {
-    agents: [{ en: "Brother Milor", text: "Nachdem ein Zerstörer oder Kreuzer eines Spielers zerstört wurde, darfst du die Karte erschöpfen. Der Spieler darf dann bis zu 2 Jäger aus seinem Nachschub in das System dieser Einheit setzen.",
-      codex: "Codex III (Ω): Auslöser ist jede im Kampf zerstörte Einheit eines Spielers. War es ein Schiff, setzt er 2 Jäger in dieses System, war es eine Bodentruppe, 2 Infanterie auf diesen Planeten." }],
-    commander: { en: "Brother Omar", unlock: "Die Fraktionsfähigkeit Indoctrination nutzen.",
+    agents: [{ de: "Bruder Milor", en: "Brother Milor", text: "Nachdem ein Zerstörer oder Kreuzer eines Spielers zerstört wurde, darfst du die Karte erschöpfen. Der Spieler darf dann bis zu 2 Jäger aus seinem Nachschub in das System dieser Einheit setzen.",
+      codex: "Codex III (Ω): Nachdem eine Einheit eines Spielers zerstört wurde, darfst du die Karte erschöpfen. War es ein Schiff, darf der Spieler 2 Jäger in dieses System setzen, war es eine Bodentruppe, 2 Infanterie auf diesen Planeten." }],
+    commander: { de: "Bruder Omar", en: "Brother Omar", unlock: "Die Fraktionsfähigkeit Indoctrination nutzen.",
       text: "Die Karte erfüllt eine grüne Technologie-Voraussetzung. Wenn du produzierst, darfst du 1 zusätzliche Infanterie zu ihren normalen Kosten produzieren, die nicht gegen dein Produktionslimit zählt.",
       codex: "Codex III (Ω): Freischalten durch eine beliebige Fraktionsfähigkeit. Erfüllt weiter eine grüne Voraussetzung, und erforschst du eine Technologie, die ein anderer Spieler besitzt, darfst du 1 Infanterie zurücklegen, um ihre Voraussetzungen zu ignorieren." },
-    hero: { en: "Dannel of the Tenth", text: "Materialaktion: Für jeden Planeten mit deiner Infanterie machst du ihn entweder spielbereit oder setzt dort so viel Infanterie aus deinem Nachschub hinzu, wie bereits darauf steht. Danach wird die Karte vernichtet.",
-      codex: "Codex III (Ω): Materialaktion, entsende bis zu 3 Infanterie aus deinem Nachschub auf Nicht-Heimat-Planeten und handle dort die Bodenkämpfe ab, Weltraumkanonen dürfen nicht auf sie feuern." }
+    hero: { de: "Dannel von der 10.", en: "Dannel of the Tenth", text: "Materialaktion: Für jeden Planeten mit deiner Infanterie machst du ihn entweder spielbereit oder setzt dort so viel Infanterie aus deinem Nachschub hinzu, wie bereits darauf steht. Danach wird die Karte vernichtet.",
+      codex: "Codex III (Ω): Materialaktion, entsende bis zu 3 Infanterie aus deinem Nachschub auf beliebige Nicht-Heimat-Planeten und handle dort Einmärsche ab. Weltraumkanonen dürfen nicht auf diese Einheiten feuern. Danach wird die Karte vernichtet." }
   },
-  promissory: { en: "Greyfire Mutagen", text: "Zu Beginn eines Bodenkampfs gegen 2 oder mehr Bodentruppen, die nicht dem Yin-Spieler gehören, ersetzt du 1 gegnerische Infanterie durch 1 Infanterie aus deinem Nachschub. Danach geht die Karte an den Yin-Spieler zurück." },
+  promissory: { de: "Graubrand-Mutagen", en: "Greyfire Mutagen", text: "Nachdem ein System aktiviert wurde, darf der Yin-Spieler während dieser Taktikaktion keine Fraktionsfähigkeiten oder Fraktionstechnologien verwenden. Danach geht die Karte an ihn zurück.",
+    codex: "Codex I (Ω): Zu Beginn eines Bodenkampfs gegen 2 oder mehr Bodentruppen, die nicht dem Yin-Spieler gehören, ersetzt du 1 gegnerische Infanterie durch 1 Infanterie aus deinem Nachschub. Danach geht die Karte an den Yin-Spieler zurück." },
   play: "Opferbereite Fanatiker, die eigene Schiffe für Treffer hergeben und gegnerische Infanterie bekehren."
 },
 
-{ id: "yssaril", en: "The Yssaril Tribes", src: "base", short: "Yssaril",
+{ id: "yssaril", de: "Die Yssaril-Stämme", en: "The Yssaril Tribes", src: "base", short: "Yssaril",
   complexity: 1, commodities: 3, homeTile: "15",
   home: [{ name: "Retillion", res: 2, inf: 3 }, { name: "Shalloq", res: 1, inf: 2 }],
   start: { units: "2 Träger, 1 Kreuzer, 2 Jäger, 5 Infanterie, 1 PVS, 1 Raumwerft", tech: ["Neurostimulator"] },
@@ -540,7 +545,7 @@ TI4.factions = [
   play: "Meister der Aktionskarten, die Züge hinauszögern und mit voller Hand im richtigen Moment zuschlagen."
 },
 
-{ id: "argent", en: "The Argent Flight", src: "pok", short: "Argent",
+{ id: "argent", de: "Die Silberschwingen", en: "The Argent Flight", src: "pok", short: "Silberschwingen",
   complexity: 1, commodities: 3, homeTile: "58",
   home: [{ name: "Valk", res: 2, inf: 0 }, { name: "Avar", res: 1, inf: 1 }, { name: "Ylir", res: 0, inf: 2 }],
   start: { units: "1 Träger, 2 Zerstörer, 2 Jäger, 5 Infanterie, 1 PVS, 1 Raumwerft", tech: ["Wahl: 2 aus Neurostimulator, Sarween-Werkzeuge, Plasmabrenner"] },
@@ -574,7 +579,7 @@ TI4.factions = [
   play: "Schnelle Zerstörerflotte mit starker Jägerabwehr und großem Gewicht bei Abstimmungen."
 },
 
-{ id: "vuilraith", de: "Die Vuil‘raith-Verschwörung", en: "The Vuil'raith Cabal", src: "pok", short: "Vuil'raith",
+{ id: "vuilraith", de: "Die Vuil’raith-Verschwörung", en: "The Vuil'raith Cabal", src: "pok", short: "Vuil'raith",
   complexity: 3, commodities: 2, homeTile: "54",
   home: [{ name: "Acheron", res: 4, inf: 0 }],
   start: { units: "1 Schlachtschiff, 1 Träger, 1 Kreuzer, 3 Jäger, 3 Infanterie, 1 Raumwerft", tech: ["Self-Assembly Routines"] },
@@ -707,7 +712,7 @@ TI4.factions = [
   play: "Flexibler Allrounder mit drei Agenten und einem Flaggschiff, das schon zu Beginn auf dem Spielplan steht."
 },
 
-{ id: "naazrokha", en: "The Naaz-Rokha Alliance", src: "pok", short: "Naaz-Rokha",
+{ id: "naazrokha", de: "Die Naaz-Rokha-Allianz", en: "The Naaz-Rokha Alliance", src: "pok", short: "Naaz-Rokha",
   complexity: 1, commodities: 3, homeTile: "57",
   home: [{ name: "Naazir", res: 2, inf: 1 }, { name: "Rokha", res: 1, inf: 2 }],
   start: { units: "2 Träger, 1 Zerstörer, 2 Jäger, 1 Mech, 3 Infanterie, 1 Raumwerft", tech: ["Psychoarchaeology", "AI Development Algorithm"] },
@@ -774,40 +779,40 @@ TI4.factions = [
   play: "Verteidigungsstarke Fraktion, die über Schläfermarker plötzlich überall PVS und Mechs auftauchen lässt."
 },
 
-{ id: "keleres", en: "The Council Keleres", src: "codex", short: "Keleres",
+{ id: "keleres", de: "Die Keleres des Rates", en: "The Council Keleres", src: "codex", short: "Keleres",
   complexity: 2, commodities: 2, homeTile: "2 / 14 / 58",
   home: [
     { name: "Moll Primus", res: 4, inf: 1, via: "Mentak" },
     { name: "Archon Ren", res: 2, inf: 3, via: "Xxcha" },
     { name: "Archon Tau", res: 1, inf: 1, via: "Xxcha" },
-    { name: "Valk", res: 2, inf: 0, via: "Argent" },
-    { name: "Avar", res: 1, inf: 1, via: "Argent" },
-    { name: "Ylir", res: 0, inf: 2, via: "Argent" }
+    { name: "Valk", res: 2, inf: 0, via: "Silberschwingen" },
+    { name: "Avar", res: 1, inf: 1, via: "Silberschwingen" },
+    { name: "Ylir", res: 0, inf: 2, via: "Silberschwingen" }
   ],
   start: { units: "2 Träger, 1 Kreuzer, 2 Jäger, 2 Infanterie, 1 Raumwerft", tech: ["Wahl: 2 Nicht-Fraktionstechnologien, die andere Spieler besitzen"] },
   abilities: [
-    { en: "The Tribunii", text: "Beim Aufbau wählst du eine Fraktion, die nicht im Spiel ist, aus Mentak, Xxcha und Argent. Du nimmst ihr Heimat-System, ihre Kommando- und Kontrollmarker sowie den passenden Keleres-Helden." },
-    { en: "Council Patronage", text: "Zu Beginn der Strategiephase füllst du deine Massenprodukte auf und erhältst danach 1 Handelsware." },
-    { en: "Law's Order", text: "Zu Beginn des Zuges eines beliebigen Spielers darfst du 1 Handelsware oder 1 Massenprodukt ausgeben. Bis zum Ende dieses Zuges gelten alle Gesetze als textlos." }
+    { de: "Die Tribune", en: "The Tribunii", text: "Beim Aufbau wählst du eine Fraktion, die nicht im Spiel ist, aus Mentak, Xxcha und Silberschwingen. Du nimmst ihr Heimat-System, ihre Kommando- und Kontrollmarker sowie den passenden Keleres-Helden." },
+    { de: "Vom Rat finanziert", en: "Council Patronage", text: "Zu Beginn der Strategiephase füllst du deine Massenprodukte auf und erhältst danach 1 Handelsware." },
+    { de: "Über dem Gesetz", en: "Law's Order", text: "Zu Beginn deines Zuges darfst du 1 Einfluss ausgeben. Bis zum Ende deines Zuges gelten alle Gesetze als textlos." }
   ],
   flagship: { en: "Artemiris", cost: 8, combat: "7 (×2)", move: 1, capacity: 6,
     text: "Schadensresistenz. Andere Spieler müssen 2 Einfluss ausgeben, um das System dieses Schiffs zu aktivieren." },
   mech: { en: "Omniopiares", cost: 2, combat: "6",
     text: "Schadensresistenz. Andere Spieler müssen 1 Einfluss ausgeben, um Bodentruppen auf diesen Planeten zu entsenden." },
   techs: [
-    { en: "I.I.H.Q. Modernization", color: "gelb", prereq: "Y",
+    { de: "Basis-Modernisierung", en: "I.I.H.Q. Modernization", color: "gelb", prereq: "Y",
       text: "Du bist Nachbar aller Spieler mit Einheiten oder Planeten im oder angrenzend an das Mecatol-Rex-System. Du erhältst die Planetenkarte Custodia Vigilia samt Karte des legendären Planeten, kannst beide nicht verlieren und auf diese Technologie darf kein Assimilatormarker gelegt werden." },
-    { en: "Agency Supply Network", color: "gelb", prereq: "YY",
-      text: "Einmal pro Aktion darfst du, wenn du die Produktion einer Einheit abhandelst, zusätzlich die Produktion einer anderen deiner Einheiten in einem beliebigen System abhandeln." }
+    { de: "Agenten-Versorgungsnetz", en: "Agency Supply Network", color: "gelb", prereq: "YY",
+      text: "Wenn du eine deiner Produktion-Fähigkeiten abhandelst, darfst du zusätzlich eine deiner Produktion-Fähigkeiten in einem beliebigen System abhandeln. Diese zusätzliche Verwendung löst die Technologie nicht erneut aus." }
   ],
   leaders: {
     agents: [{ en: "Xander Alexin Victori III", text: "Du darfst die Karte jederzeit erschöpfen, damit ein beliebiger Spieler Massenprodukte wie Handelswaren ausgeben kann." }],
     commander: { en: "Suffi An", unlock: "Nach dem Ausspielen einer Aktionskarte mit Materialaktion 1 Handelsware ausgeben.",
       text: "Nachdem du eine Materialaktion durchgeführt hast, darfst du eine weitere Aktion durchführen." },
     hero: { en: "Harka Leeds / Odlynn Myrr / Kuuasi Aun Jalatai",
-      text: "Du nutzt nur den Helden deiner gewählten Herkunft, er wird nach Gebrauch vernichtet. Harka Leeds (Mentak), Materialaktion: Decke Aktionskarten auf, bis 3 mit Materialaktion dabei sind, nimm diese auf die Hand und mische den Rest zurück. Odlynn Myrr (Xxcha), nach dem Aufdecken einer Agenda: Gib bis zu 6 zusätzliche Stimmen ab und prognostiziere ein Ergebnis, für jeden Spieler, der sich enthält oder anders stimmt, erhältst du 1 Handelsware und 1 Kommandomarker. Kuuasi Aun Jalatai (Argent), zu Beginn einer Raumkampfrunde in einem System mit einem deiner Planeten: Setze dein Flaggschiff und bis zu 2 Kreuzer oder Zerstörer aus deinem Nachschub ins aktive System." }
+      text: "Du nutzt nur den Helden deiner gewählten Herkunft, er wird nach Gebrauch vernichtet. Harka Leeds (Mentak), Materialaktion: Decke Aktionskarten auf, bis 3 mit Materialaktion dabei sind, nimm diese auf die Hand und mische den Rest zurück. Odlynn Myrr (Xxcha), nach dem Aufdecken einer Agenda: Gib bis zu 6 zusätzliche Stimmen ab und prognostiziere ein Ergebnis. Für jeden Spieler, der für ein anderes Ergebnis stimmt, erhältst du 1 Handelsware und 1 Kommandomarker. Kuuasi Aun Jalatai (Silberschwingen), zu Beginn einer Raumkampfrunde in einem System mit einem deiner Planeten: Setze dein Flaggschiff und insgesamt 2 Kreuzer und/oder Zerstörer aus deinem Nachschub ins aktive System." }
   },
-  promissory: { en: "Keleres Rider", text: "Nachdem eine Agenda aufgedeckt wurde, verzichtest du auf deine Stimmen und gibst eine Prognose ab. Liegst du richtig, ziehst du 1 Aktionskarte und erhältst 2 Handelswaren. Danach geht die Karte an den Keleres-Spieler zurück." },
+  promissory: { de: "Die Keleres-Klausel", en: "Keleres Rider", text: "Nachdem eine Agenda aufgedeckt wurde, verzichtest du auf deine Stimmen und gibst eine Prognose ab. Liegst du richtig, ziehst du 1 Aktionskarte und erhältst 2 Handelswaren. Danach geht die Karte an den Keleres-Spieler zurück." },
   play: "Politisch wendige Fraktion, die Gesetze aushebelt und mit Massenprodukten und Handelswaren flexibel bleibt."
 }
 ];

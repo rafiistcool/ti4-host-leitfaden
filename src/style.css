@@ -395,6 +395,53 @@ table.balance small{font-size:12px;color:var(--muted)}
 .origs .links{display:flex;flex-wrap:wrap;gap:8px}
 .origs .btn{height:48px;flex:1 1 auto}
 .origs .btn svg{stroke:currentColor}
+
+/* ---------- Originalmaterial und beschriftete Referenzbilder ---------- */
+.f-portrait{display:block;width:64px;height:72px;object-fit:cover;border-radius:8px}
+.asset-figure{margin:16px 0;min-width:0}
+.asset-open{position:relative;display:block;width:100%;padding:10px;border:1px solid var(--line-2);border-radius:10px;background:#111925;cursor:zoom-in;overflow:hidden}
+.asset-open img{display:block;width:100%;height:auto;object-fit:contain}
+.asset-open:hover{border-color:var(--accent)}
+.asset-open:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.asset-zoom{position:absolute;right:7px;bottom:7px;background:#172033ee;color:#fff;font-size:12px;border:1px solid #53617a;padding:2px 8px;border-radius:4px}
+.asset-figure figcaption{display:flex;flex-wrap:wrap;align-items:center;gap:5px 8px;font-size:12px;line-height:1.35;color:var(--muted);margin-top:7px}
+.asset-status{font-weight:600;padding:3px 6px;border-radius:4px;background:var(--accent-soft);color:var(--accent-ink)}
+.asset-status.is-original{background:var(--chrome);color:var(--chrome-accent)}
+.card-image .asset-open img{height:180px}
+.sheet-image .asset-open{padding:0}
+.sheet-image .asset-open img{max-height:520px}
+.component-sheet{margin:0 0 14px}
+.text-details{margin:12px 0 20px;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.text-details summary{cursor:pointer;font-weight:600;color:var(--accent)}
+.text-details .fsheet{margin-top:14px}
+.asset-notice{padding:16px 18px;background:var(--accent-soft);border-left:4px solid var(--accent);border-radius:0 8px 8px 0;margin:18px 0}
+.asset-notice p{font-size:15px;line-height:1.5;margin:8px 0 0}
+.asset-controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:20px 0 10px}
+.asset-controls .field{flex:1 1 260px;margin:0}
+.asset-select{display:grid;gap:3px;font-size:13px;color:var(--muted);flex:1 1 180px}
+.asset-select select{width:100%;min-height:48px;font:inherit;font-size:16px;padding:8px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-2);border-radius:6px}
+.asset-library{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px;margin:16px 0 24px}
+.asset-entry{padding:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;min-width:0}
+.asset-entry[hidden]{display:none}
+.asset-entry h2{font-size:22px;line-height:1.15;margin:0 0 5px}
+.asset-entry .kind{margin:0;color:var(--muted);font-size:13px}
+.asset-entry .asset-open img{height:230px}
+.asset-source{font-size:14px;display:inline-block;padding:6px 0}
+.asset-related{margin:12px 0;font-size:14px}
+.asset-related summary{cursor:pointer;color:var(--accent);font-weight:600}
+.asset-extras{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px}
+.asset-dialog{width:min(1000px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:0;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);color:var(--ink);overscroll-behavior:contain}
+.asset-dialog::backdrop{background:#03070dd9}
+.asset-dialog-head{position:sticky;top:0;z-index:2;display:flex;gap:12px;justify-content:space-between;align-items:flex-start;padding:14px;background:var(--surface);border-bottom:1px solid var(--line)}
+.asset-dialog-head h2{font-size:24px;line-height:1.2;margin:0}
+.asset-dialog-head p{font-size:13px;color:var(--muted);margin:5px 0 0}
+.asset-dialog-head .btn{flex:none;height:auto;min-height:44px;padding:8px 12px}
+.asset-dialog-image{background:#111925;padding:12px;text-align:center;overflow:auto}
+.asset-dialog-image img{display:block;width:100%;max-width:1200px;height:auto;margin:auto}
+.asset-dialog.is-zoomed .asset-dialog-image img{width:auto;min-width:800px;max-width:none}
+.asset-dialog-foot{padding:14px 18px;font-size:15px}
+.asset-dialog-foot p{margin:0 0 10px}
+@media (max-width:480px){.asset-dialog-head{flex-wrap:wrap}.asset-dialog-head h2{font-size:21px}.asset-dialog-head .btn{font-size:14px}.asset-dialog-head>div{flex:1 1 190px}}
 .prevnext{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .prevnext a{display:flex;align-items:center;gap:8px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);text-decoration:none;font-weight:700;min-width:0}
 .prevnext a svg{stroke:var(--accent);flex:none}
