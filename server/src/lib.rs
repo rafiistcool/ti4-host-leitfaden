@@ -1,6 +1,7 @@
 //! Hub-API für den TI4 Host-Leitfaden: Spieler und Sessions mit Fraktionen, Siegpunkten und Platzierungen.
 //! Eine SQLite-Datei, kein Login. Fehler kommen als Problem Details (RFC 9457) mit deutschem `detail`.
 
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -46,9 +47,24 @@ CREATE TABLE IF NOT EXISTS participant (
 CREATE INDEX IF NOT EXISTS idx_participant_player ON participant (player_id);
 ";
 
-const STALE: &str = "Jemand anderes hat dieses Spiel gerade geändert. Die Seite lädt den neuen Stand, bitte nochmal speichern.";
+const STALE: &str = "Jemand anderes hat dieses Spiel inzwischen geändert.";
 
 pub type Db = Arc<Mutex<Connection>>;
+
+/// Datenbankarbeit auf einem Blocking-Thread, damit SQLite-I/O keine Tokio-Worker blockiert.
+/// Ein Panic in einem früheren Request vergiftet den Mutex nicht dauerhaft.
+async fn run<T, F>(db: Db, f: F) -> ApiResult<T>
+where
+    T: Send + 'static,
+    F: FnOnce(&mut Connection) -> ApiResult<T> + Send + 'static,
+{
+    tokio::task::spawn_blocking(move || {
+        let mut conn = db.lock().unwrap_or_else(|e| e.into_inner());
+        f(&mut conn)
+    })
+    .await
+    .map_err(|_| internal())?
+}
 
 /// Öffnet (oder legt an) die Datenbank. `":memory:"` für Tests.
 pub fn open(path: &str) -> rusqlite::Result<Db> {
@@ -78,6 +94,13 @@ pub fn app(db: Db, cors_origins: &[String]) -> Router {
             "/api/games/{id}",
             get(get_game).put(update_game).delete(delete_game),
         )
+        .fallback(|| async { not_found("Diesen API-Pfad gibt es nicht.") })
+        .method_not_allowed_fallback(|| async {
+            ApiError(
+                StatusCode::METHOD_NOT_ALLOWED,
+                "Diese Methode gibt es hier nicht.".into(),
+            )
+        })
         .with_state(db);
     // Nur nötig, wenn Seite und API unter verschiedenen Adressen laufen (z. B. GitHub Pages + eigener Server).
     let origins: Vec<HeaderValue> = cors_origins.iter().filter_map(|o| o.parse().ok()).collect();
@@ -105,6 +128,12 @@ fn conflict(msg: impl Into<String>) -> ApiError {
 }
 fn not_found(msg: impl Into<String>) -> ApiError {
     ApiError(StatusCode::NOT_FOUND, msg.into())
+}
+fn internal() -> ApiError {
+    ApiError(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Interner Fehler im Hub-Server.".into(),
+    )
 }
 
 impl From<rusqlite::Error> for ApiError {
@@ -136,6 +165,12 @@ fn parse<T: for<'de> Deserialize<'de>>(body: &Bytes) -> ApiResult<T> {
     serde_json::from_slice(body).map_err(|_| bad("Ungültige Eingabe."))
 }
 
+/// IDs aus dem Pfad selbst lesen, damit auch hier Problem Details statt Klartext zurückkommen.
+fn parse_id(raw: &str) -> ApiResult<i64> {
+    raw.parse()
+        .map_err(|_| bad(format!("„{raw}“ ist keine gültige ID.")))
+}
+
 /* ---------- Spieler ---------- */
 
 #[derive(Serialize)]
@@ -160,25 +195,32 @@ fn player_name(req: PlayerRequest) -> ApiResult<String> {
     Ok(name)
 }
 
+/// Vergleich ohne Groß-/Kleinschreibung, auch für Umlaute (SQLite-lower() kann nur ASCII).
+/// Die Spielerliste einer Runde ist klein, darum wird in Rust verglichen.
 fn name_taken(conn: &Connection, name: &str, except: i64) -> rusqlite::Result<bool> {
-    // lower() reicht für ASCII; Umlaute vergleicht SQLite ohnehin exakt.
-    conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM player WHERE lower(name) = lower(?1) AND id <> ?2)",
-        params![name, except],
-        |r| r.get(0),
-    )
+    let wanted = name.to_lowercase();
+    let mut stmt = conn.prepare("SELECT name FROM player WHERE id <> ?1")?;
+    let names = stmt.query_map([except], |r| r.get::<_, String>(0))?;
+    for n in names {
+        if n?.to_lowercase() == wanted {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 async fn list_players(State(db): State<Db>) -> ApiResult<Json<Vec<PlayerDto>>> {
-    let conn = db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT id, name FROM player ORDER BY name COLLATE NOCASE")?;
-    let rows = stmt.query_map([], |r| {
-        Ok(PlayerDto {
-            id: r.get(0)?,
-            name: r.get(1)?,
-        })
-    })?;
-    Ok(Json(rows.collect::<Result<_, _>>()?))
+    run(db, |conn| {
+        let mut stmt = conn.prepare("SELECT id, name FROM player ORDER BY name COLLATE NOCASE")?;
+        let rows = stmt.query_map([], |r| {
+            Ok(PlayerDto {
+                id: r.get(0)?,
+                name: r.get(1)?,
+            })
+        })?;
+        Ok(Json(rows.collect::<Result<_, _>>()?))
+    })
+    .await
 }
 
 async fn create_player(
@@ -186,46 +228,63 @@ async fn create_player(
     body: Bytes,
 ) -> ApiResult<(StatusCode, Json<PlayerDto>)> {
     let name = player_name(parse(&body)?)?;
-    let conn = db.lock().unwrap();
-    if name_taken(&conn, &name, 0)? {
-        return Err(conflict(format!(
-            "Es gibt schon einen Spieler namens „{name}“."
-        )));
-    }
-    conn.execute("INSERT INTO player (name) VALUES (?1)", [&name])?;
-    Ok((
-        StatusCode::CREATED,
-        Json(PlayerDto {
-            id: conn.last_insert_rowid(),
-            name,
-        }),
-    ))
+    run(db, move |conn| {
+        if name_taken(conn, &name, 0)? {
+            return Err(conflict(format!(
+                "Es gibt schon einen Spieler namens „{name}“."
+            )));
+        }
+        conn.execute("INSERT INTO player (name) VALUES (?1)", [&name])?;
+        Ok((
+            StatusCode::CREATED,
+            Json(PlayerDto {
+                id: conn.last_insert_rowid(),
+                name,
+            }),
+        ))
+    })
+    .await
 }
 
 async fn rename_player(
     State(db): State<Db>,
-    UrlPath(id): UrlPath<i64>,
+    UrlPath(id): UrlPath<String>,
     body: Bytes,
 ) -> ApiResult<Json<PlayerDto>> {
+    let id = parse_id(&id)?;
     let name = player_name(parse(&body)?)?;
-    let conn = db.lock().unwrap();
-    if name_taken(&conn, &name, id)? {
-        return Err(conflict(format!(
-            "Es gibt schon einen Spieler namens „{name}“."
-        )));
-    }
-    if conn.execute(
-        "UPDATE player SET name = ?1 WHERE id = ?2",
-        params![name, id],
-    )? == 0
-    {
-        return Err(not_found(format!("Spieler {id} gibt es nicht.")));
-    }
-    Ok(Json(PlayerDto { id, name }))
+    run(db, move |conn| {
+        let exists: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM player WHERE id = ?1)",
+            [id],
+            |r| r.get(0),
+        )?;
+        if !exists {
+            return Err(not_found(format!("Spieler {id} gibt es nicht.")));
+        }
+        if name_taken(conn, &name, id)? {
+            return Err(conflict(format!(
+                "Es gibt schon einen Spieler namens „{name}“."
+            )));
+        }
+        conn.execute(
+            "UPDATE player SET name = ?1 WHERE id = ?2",
+            params![name, id],
+        )?;
+        Ok(Json(PlayerDto { id, name }))
+    })
+    .await
 }
 
-async fn delete_player(State(db): State<Db>, UrlPath(id): UrlPath<i64>) -> ApiResult<StatusCode> {
-    let conn = db.lock().unwrap();
+async fn delete_player(
+    State(db): State<Db>,
+    UrlPath(id): UrlPath<String>,
+) -> ApiResult<StatusCode> {
+    let id = parse_id(&id)?;
+    run(db, move |conn| delete_player_tx(conn, id)).await
+}
+
+fn delete_player_tx(conn: &mut Connection, id: i64) -> ApiResult<StatusCode> {
     let name: Option<String> = conn
         .query_row("SELECT name FROM player WHERE id = ?1", [id], |r| r.get(0))
         .optional()?;
@@ -272,7 +331,7 @@ pub struct GameDto {
 }
 
 /// Anlegen und Bearbeiten. Die Teilnehmerliste ersetzt die bisherige komplett.
-/// `version` kommt aus dem zuletzt geladenen Stand; beim Anlegen weglassen.
+/// Beim Ändern sind `version` (aus dem zuletzt geladenen Stand) und `participants` Pflicht.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GameRequest {
@@ -299,13 +358,19 @@ fn blank_to_none(s: Option<String>) -> Option<String> {
     s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
+fn parse_when(raw: &str) -> Option<NaiveDateTime> {
+    // %.f liest optionale Sekundenbruchteile, wie ISO-8601 sie erlaubt
+    NaiveDateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M:%S%.f")
+        .or_else(|_| NaiveDateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M"))
+        .ok()
+}
+
 fn validate(req: GameRequest) -> ApiResult<GameInput> {
-    let raw = req
+    let at = req
         .scheduled_at
+        .as_deref()
+        .and_then(parse_when)
         .ok_or_else(|| bad("Bitte Datum und Uhrzeit angeben."))?;
-    let at = NaiveDateTime::parse_from_str(&raw, "%Y-%m-%dT%H:%M:%S")
-        .or_else(|_| NaiveDateTime::parse_from_str(&raw, "%Y-%m-%dT%H:%M"))
-        .map_err(|_| bad("Bitte Datum und Uhrzeit angeben."))?;
     let status = match req.status.as_deref() {
         Some("PLANNED") => "PLANNED",
         Some("FINISHED") => "FINISHED",
@@ -324,11 +389,13 @@ fn validate(req: GameRequest) -> ApiResult<GameInput> {
         return Err(bad("Die Notiz darf höchstens 2000 Zeichen haben."));
     }
     let mut participants = req.participants.unwrap_or_default();
-    if participants.len() > 8 {
+    let n = participants.len() as i64;
+    if n > 8 {
         return Err(bad("Höchstens 8 Spieler pro Spiel."));
     }
-    let mut players = std::collections::HashSet::new();
-    let mut factions = std::collections::HashSet::new();
+    let mut players = HashSet::new();
+    let mut factions = HashSet::new();
+    let mut places = HashSet::new();
     for p in &mut participants {
         let id = p
             .player_id
@@ -353,18 +420,19 @@ fn validate(req: GameRequest) -> ApiResult<GameInput> {
         if p.victory_points.is_some_and(|v| !(0..=30).contains(&v)) {
             return Err(bad("Siegpunkte zwischen 0 und 30, bitte prüfen."));
         }
-        if p.placement.is_some_and(|v| !(1..=8).contains(&v)) {
-            return Err(bad("Platzierungen von 1 bis 8."));
+        if let Some(pl) = p.placement {
+            if !(1..=n).contains(&pl) {
+                return Err(bad(format!("Platz {pl} gibt es bei {n} Spielern nicht.")));
+            }
+            if !places.insert(pl) {
+                return Err(bad(format!("Platz {pl} ist doppelt vergeben.")));
+            }
         }
     }
+    // Bei geplanten Spielen bleiben eingetragene Werte erhalten (falls jemand versehentlich zurückstellt),
+    // Statistiken zählen nur gespielte Partien.
     if status == "FINISHED" {
         participants = with_placements(participants);
-    } else {
-        // Geplant: Ergebnisse gibt es noch nicht.
-        for p in &mut participants {
-            p.victory_points = None;
-            p.placement = None;
-        }
     }
     Ok(GameInput {
         scheduled_at: at.format("%Y-%m-%dT%H:%M:%S").to_string(),
@@ -376,61 +444,72 @@ fn validate(req: GameRequest) -> ApiResult<GameInput> {
     })
 }
 
-/// Fehlt bei einem gespielten Spiel irgendeine Platzierung, ergibt sich die ganze Reihenfolge aus den
-/// Siegpunkten (mehr Punkte = besserer Platz, bei Gleichstand zählt die Reihenfolge der Liste).
-/// Die Seite (hub.js) rechnet für den lokalen Modus genauso.
-pub fn with_placements(list: Vec<ParticipantDto>) -> Vec<ParticipantDto> {
-    if !list.is_empty() && list.iter().all(|p| p.placement.is_some()) {
-        return list;
+/// Füllt fehlende Plätze aus den Siegpunkten auf: Wer Siegpunkte, aber keinen Platz hat, bekommt der Reihe
+/// nach (mehr Punkte zuerst, bei Gleichstand Listenreihenfolge) die noch freien Plätze. Eingetragene Plätze
+/// bleiben, wer weder Punkte noch Platz hat, bleibt ohne Platz.
+/// Die Seite (hub.js) rechnet für den lokalen Modus und die Vorschau genauso.
+pub fn with_placements(mut list: Vec<ParticipantDto>) -> Vec<ParticipantDto> {
+    let taken: HashSet<i64> = list.iter().filter_map(|p| p.placement).collect();
+    let mut open: Vec<usize> = (0..list.len())
+        .filter(|&i| list[i].placement.is_none() && list[i].victory_points.is_some())
+        .collect();
+    open.sort_by_key(|&i| std::cmp::Reverse(list[i].victory_points)); // stabil
+    let mut next = 1;
+    for i in open {
+        while taken.contains(&next) {
+            next += 1;
+        }
+        list[i].placement = Some(next);
+        next += 1;
     }
-    let mut order: Vec<usize> = (0..list.len()).collect();
-    order.sort_by_key(|&i| std::cmp::Reverse(list[i].victory_points.unwrap_or(0))); // stabil
-    let mut out = list;
-    for (rank, i) in order.into_iter().enumerate() {
-        out[i].placement = Some(rank as i64 + 1);
-    }
-    out
+    list
 }
+
+fn read_participant(r: &rusqlite::Row, offset: usize) -> rusqlite::Result<ParticipantDto> {
+    Ok(ParticipantDto {
+        player_id: r.get(offset)?,
+        faction: r.get(offset + 1)?,
+        victory_points: r.get(offset + 2)?,
+        placement: r.get(offset + 3)?,
+    })
+}
+
+fn read_game(r: &rusqlite::Row) -> rusqlite::Result<GameDto> {
+    Ok(GameDto {
+        id: r.get(0)?,
+        scheduled_at: r.get(1)?,
+        location: r.get(2)?,
+        status: r.get(3)?,
+        points_to_win: r.get(4)?,
+        notes: r.get(5)?,
+        version: r.get(6)?,
+        participants: vec![],
+    })
+}
+
+const GAME_COLS: &str = "id, scheduled_at, location, status, points_to_win, notes, version";
 
 fn load_game(conn: &Connection, id: i64) -> ApiResult<GameDto> {
     let game = conn
         .query_row(
-            "SELECT id, scheduled_at, location, status, points_to_win, notes, version FROM game WHERE id = ?1",
+            &format!("SELECT {GAME_COLS} FROM game WHERE id = ?1"),
             [id],
-            |r| {
-                Ok(GameDto {
-                    id: r.get(0)?,
-                    scheduled_at: r.get(1)?,
-                    location: r.get(2)?,
-                    status: r.get(3)?,
-                    points_to_win: r.get(4)?,
-                    notes: r.get(5)?,
-                    version: r.get(6)?,
-                    participants: vec![],
-                })
-            },
+            read_game,
         )
         .optional()?;
     let mut game = game.ok_or_else(|| not_found(format!("Spiel {id} gibt es nicht.")))?;
-    let mut stmt = conn.prepare(
+    let mut stmt = conn.prepare_cached(
         "SELECT player_id, faction, victory_points, placement FROM participant WHERE game_id = ?1 ORDER BY seat",
     )?;
     game.participants = stmt
-        .query_map([id], |r| {
-            Ok(ParticipantDto {
-                player_id: r.get(0)?,
-                faction: r.get(1)?,
-                victory_points: r.get(2)?,
-                placement: r.get(3)?,
-            })
-        })?
+        .query_map([id], |r| read_participant(r, 0))?
         .collect::<Result<_, _>>()?;
     Ok(game)
 }
 
 fn save_participants(conn: &Connection, game_id: i64, list: &[ParticipantDto]) -> ApiResult<()> {
     conn.execute("DELETE FROM participant WHERE game_id = ?1", [game_id])?;
-    let mut stmt = conn.prepare(
+    let mut stmt = conn.prepare_cached(
         "INSERT INTO participant (game_id, player_id, seat, faction, victory_points, placement) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     )?;
     for (seat, p) in list.iter().enumerate() {
@@ -455,73 +534,100 @@ fn save_participants(conn: &Connection, game_id: i64, list: &[ParticipantDto]) -
     Ok(())
 }
 
-/// Alle Spiele, neueste zuerst. Für eine Spielrunde unter Freunden reicht das ohne Paging.
-async fn list_games(State(db): State<Db>) -> ApiResult<Json<Vec<GameDto>>> {
-    let conn = db.lock().unwrap();
-    let ids: Vec<i64> = conn
-        .prepare("SELECT id FROM game ORDER BY scheduled_at DESC, id DESC")?
-        .query_map([], |r| r.get(0))?
+/// Alle Spiele, neueste zuerst, mit zwei Abfragen statt einer pro Spiel.
+/// Für eine Spielrunde unter Freunden reicht das ohne Paging.
+fn all_games(conn: &Connection) -> ApiResult<Vec<GameDto>> {
+    let mut games: Vec<GameDto> = conn
+        .prepare(&format!(
+            "SELECT {GAME_COLS} FROM game ORDER BY scheduled_at DESC, id DESC"
+        ))?
+        .query_map([], read_game)?
         .collect::<Result<_, _>>()?;
-    Ok(Json(
-        ids.into_iter()
-            .map(|id| load_game(&conn, id))
-            .collect::<Result<_, _>>()?,
-    ))
+    let index: HashMap<i64, usize> = games.iter().enumerate().map(|(i, g)| (g.id, i)).collect();
+    let mut stmt = conn.prepare(
+        "SELECT game_id, player_id, faction, victory_points, placement FROM participant ORDER BY game_id, seat",
+    )?;
+    let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, read_participant(r, 1)?)))?;
+    for row in rows {
+        let (game_id, p) = row?;
+        if let Some(&i) = index.get(&game_id) {
+            games[i].participants.push(p);
+        }
+    }
+    Ok(games)
 }
 
-async fn get_game(State(db): State<Db>, UrlPath(id): UrlPath<i64>) -> ApiResult<Json<GameDto>> {
-    let conn = db.lock().unwrap();
-    Ok(Json(load_game(&conn, id)?))
+async fn list_games(State(db): State<Db>) -> ApiResult<Json<Vec<GameDto>>> {
+    run(db, |conn| Ok(Json(all_games(conn)?))).await
+}
+
+async fn get_game(State(db): State<Db>, UrlPath(id): UrlPath<String>) -> ApiResult<Json<GameDto>> {
+    let id = parse_id(&id)?;
+    run(db, move |conn| Ok(Json(load_game(conn, id)?))).await
 }
 
 async fn create_game(State(db): State<Db>, body: Bytes) -> ApiResult<(StatusCode, Json<GameDto>)> {
     let input = validate(parse(&body)?)?;
-    let mut conn = db.lock().unwrap();
-    let tx = conn.transaction()?;
-    tx.execute(
-        "INSERT INTO game (scheduled_at, location, status, points_to_win, notes) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![input.scheduled_at, input.location, input.status, input.points_to_win, input.notes],
-    )?;
-    let id = tx.last_insert_rowid();
-    save_participants(&tx, id, &input.participants)?;
-    let game = load_game(&tx, id)?;
-    tx.commit()?;
-    Ok((StatusCode::CREATED, Json(game)))
+    run(db, move |conn| {
+        let tx = conn.transaction()?;
+        tx.execute(
+            "INSERT INTO game (scheduled_at, location, status, points_to_win, notes) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![input.scheduled_at, input.location, input.status, input.points_to_win, input.notes],
+        )?;
+        let id = tx.last_insert_rowid();
+        save_participants(&tx, id, &input.participants)?;
+        let game = load_game(&tx, id)?;
+        tx.commit()?;
+        Ok((StatusCode::CREATED, Json(game)))
+    })
+    .await
 }
 
 async fn update_game(
     State(db): State<Db>,
-    UrlPath(id): UrlPath<i64>,
+    UrlPath(id): UrlPath<String>,
     body: Bytes,
 ) -> ApiResult<Json<GameDto>> {
+    let id = parse_id(&id)?;
     let req: GameRequest = parse(&body)?;
-    let client_version = req.version;
-    let input = validate(req)?;
-    let mut conn = db.lock().unwrap();
-    let tx = conn.transaction()?;
-    let current: Option<i64> = tx
-        .query_row("SELECT version FROM game WHERE id = ?1", [id], |r| r.get(0))
-        .optional()?;
-    let current = current.ok_or_else(|| not_found(format!("Spiel {id} gibt es nicht.")))?;
-    // Optimistisches Sperren: zwei gleichzeitige Bearbeitungen überschreiben sich nicht stillschweigend.
-    if client_version.is_some_and(|v| v != current) {
-        return Err(conflict(STALE));
+    // Ohne Version kein Schutz gegen gleichzeitiges Bearbeiten, ohne Liste wären alle Plätze weg.
+    let client_version = req
+        .version
+        .ok_or_else(|| bad("Der geladene Stand (version) fehlt. Bitte die Seite neu laden."))?;
+    if req.participants.is_none() {
+        return Err(bad("Die Teilnehmerliste fehlt."));
     }
-    tx.execute(
-        "UPDATE game SET scheduled_at = ?1, location = ?2, status = ?3, points_to_win = ?4, notes = ?5,
-             version = version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?6",
-        params![input.scheduled_at, input.location, input.status, input.points_to_win, input.notes, id],
-    )?;
-    save_participants(&tx, id, &input.participants)?;
-    let game = load_game(&tx, id)?;
-    tx.commit()?;
-    Ok(Json(game))
+    let input = validate(req)?;
+    run(db, move |conn| {
+        let tx = conn.transaction()?;
+        let current: Option<i64> = tx
+            .query_row("SELECT version FROM game WHERE id = ?1", [id], |r| r.get(0))
+            .optional()?;
+        let current = current.ok_or_else(|| not_found(format!("Spiel {id} gibt es nicht.")))?;
+        // Optimistisches Sperren: zwei gleichzeitige Bearbeitungen überschreiben sich nicht stillschweigend.
+        if client_version != current {
+            return Err(conflict(STALE));
+        }
+        tx.execute(
+            "UPDATE game SET scheduled_at = ?1, location = ?2, status = ?3, points_to_win = ?4, notes = ?5,
+                 version = version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?6",
+            params![input.scheduled_at, input.location, input.status, input.points_to_win, input.notes, id],
+        )?;
+        save_participants(&tx, id, &input.participants)?;
+        let game = load_game(&tx, id)?;
+        tx.commit()?;
+        Ok(Json(game))
+    })
+    .await
 }
 
-async fn delete_game(State(db): State<Db>, UrlPath(id): UrlPath<i64>) -> ApiResult<StatusCode> {
-    let conn = db.lock().unwrap();
-    if conn.execute("DELETE FROM game WHERE id = ?1", [id])? == 0 {
-        return Err(not_found(format!("Spiel {id} gibt es nicht.")));
-    }
-    Ok(StatusCode::NO_CONTENT)
+async fn delete_game(State(db): State<Db>, UrlPath(id): UrlPath<String>) -> ApiResult<StatusCode> {
+    let id = parse_id(&id)?;
+    run(db, move |conn| {
+        if conn.execute("DELETE FROM game WHERE id = ?1", [id])? == 0 {
+            return Err(not_found(format!("Spiel {id} gibt es nicht.")));
+        }
+        Ok(StatusCode::NO_CONTENT)
+    })
+    .await
 }

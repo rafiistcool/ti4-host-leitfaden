@@ -653,6 +653,9 @@ body.is-wide #view{max-width:1440px;padding-top:16px}
 .hb-mode b{color:var(--hb-ink)}
 .hb-mode.bad{border-color:#6b2b2b;background:#2a1517}
 .hb-mode.bad svg{stroke:var(--hb-bad)}
+.hb-conflict{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:10px;border:1px solid #8a3a35;background:#2a1517;color:#ffd2cc;font-size:15px}
+.hb-conflict b{color:#fff}
+.hb-conflict .hb-btn{white-space:normal;text-align:center}
 
 .hb-panel{background:var(--hb-panel);border:1px solid var(--hb-line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
 .hb-ph{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}

@@ -70,7 +70,7 @@ async fn players_games_and_placements() {
     // doppelte Fraktion wird abgelehnt
     let (s, _) = api
         .call("PUT", &format!("/api/games/{id}"), Some(json!({
-            "scheduledAt": "2026-10-17T18:00", "status": "PLANNED",
+            "scheduledAt": "2026-10-17T18:00", "status": "PLANNED", "version": version,
             "participants": [{ "playerId": rafi, "faction": "sardakk" }, { "playerId": basti, "faction": "sardakk" }]
         })))
         .await;
@@ -136,6 +136,108 @@ async fn players_games_and_placements() {
 
     let (s, _) = api.call("GET", "/api/health", None).await;
     assert_eq!(s, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn validation_and_edge_cases() {
+    let api = Api::new();
+    let a = api.player("Ärger").await;
+    let b = api.player("Bea").await;
+    let c = api.player("Cem").await;
+
+    // Groß-/Kleinschreibung auch bei Umlauten
+    let (s, _) = api
+        .call("POST", "/api/players", Some(json!({ "name": "ärger" })))
+        .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (s, _) = api
+        .call(
+            "PUT",
+            &format!("/api/players/{b}"),
+            Some(json!({ "name": "ÄRGER" })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (s, v) = api
+        .call("PUT", "/api/players/999", Some(json!({ "name": "Neu" })))
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "{v}");
+
+    // Sekundenbruchteile sind gültiges ISO-8601
+    let (s, g) = api
+        .call(
+            "POST",
+            "/api/games",
+            Some(json!({
+                "scheduledAt": "2026-10-17T18:00:00.000", "status": "FINISHED",
+                "participants": [
+                    { "playerId": a, "victoryPoints": 10, "placement": 2 },
+                    { "playerId": b, "victoryPoints": 7 },
+                    { "playerId": c }
+                ]
+            })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{g}");
+    assert_eq!(g["scheduledAt"], "2026-10-17T18:00:00");
+    // eingetragener Platz bleibt, fehlender wird aus Siegpunkten ergänzt, ohne Punkte kein Platz
+    assert_eq!(g["participants"][0]["placement"], 2);
+    assert_eq!(g["participants"][1]["placement"], 1);
+    assert_eq!(g["participants"][2]["placement"], Value::Null);
+    let id = g["id"].as_i64().unwrap();
+    let version = g["version"].as_i64().unwrap();
+
+    // doppelte und unmögliche Plätze
+    let dup = json!({ "scheduledAt": "2026-10-17T18:00", "status": "FINISHED", "version": version,
+        "participants": [{ "playerId": a, "placement": 1 }, { "playerId": b, "placement": 1 }] });
+    let (s, v) = api
+        .call("PUT", &format!("/api/games/{id}"), Some(dup))
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert_eq!(v["detail"], "Platz 1 ist doppelt vergeben.");
+    let far = json!({ "scheduledAt": "2026-10-17T18:00", "status": "FINISHED", "version": version,
+        "participants": [{ "playerId": a, "placement": 5 }] });
+    let (s, _) = api
+        .call("PUT", &format!("/api/games/{id}"), Some(far))
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    // Ändern ohne Version oder ohne Teilnehmerliste wird abgelehnt
+    let (s, _) = api
+        .call("PUT", &format!("/api/games/{id}"), Some(json!({ "scheduledAt": "2026-10-17T18:00", "status": "PLANNED", "participants": [] })))
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = api
+        .call("PUT", &format!("/api/games/{id}"), Some(json!({ "scheduledAt": "2026-10-17T18:00", "status": "PLANNED", "version": version })))
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (_, g) = api.call("GET", &format!("/api/games/{id}"), None).await;
+    assert_eq!(g["participants"].as_array().unwrap().len(), 3);
+
+    // Zurück auf „Geplant“ behält die Ergebnisse
+    let (s, g) = api
+        .call(
+            "PUT",
+            &format!("/api/games/{id}"),
+            Some(json!({
+                "scheduledAt": "2026-10-17T18:00", "status": "PLANNED", "version": version,
+                "participants": [{ "playerId": a, "victoryPoints": 10, "placement": 1 }]
+            })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(g["participants"][0]["victoryPoints"], 10);
+
+    // Fehler immer als Problem Details
+    let (s, v) = api.call("GET", "/api/games/abc", None).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert_eq!(v["detail"], "„abc“ ist keine gültige ID.");
+    let (s, v) = api.call("GET", "/api/gibtsnicht", None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert!(v["detail"].is_string());
+    let (s, v) = api.call("PATCH", "/api/games", None).await;
+    assert_eq!(s, StatusCode::METHOD_NOT_ALLOWED);
+    assert!(v["detail"].is_string());
 }
 
 #[test]

@@ -71,7 +71,7 @@ docker compose up -d --build
 
 `docker-compose.yml` startet zwei Container: `ti4-host` (nginx mit der Seite) und `ti4-hub-api` (Rust, Image `ghcr.io/rafiistcool/ti4-host-leitfaden-api`). Die Hub-Daten liegen im Volume `ti4-hub-data`; zum Sichern reicht eine Kopie davon.
 
-Im Container liefert nginx die Seite aus und leitet `/api/` an den Hub-Server weiter (`docker/nginx.conf`). Für HTTPS den Container hinter einen Reverse Proxy hängen, zum Beispiel Caddy:
+Im Container liefert nginx die Seite aus und leitet `/api/` an den Hub-Server weiter (`docker/nginx.conf`). Ist der Hub-Container gerade nicht erreichbar, antwortet nginx mit 503 und der Hub zeigt einen Hinweis, statt still nur lokal zu speichern. Für HTTPS den Container hinter einen Reverse Proxy hängen, zum Beispiel Caddy:
 
 ```
 ti4.example.de {

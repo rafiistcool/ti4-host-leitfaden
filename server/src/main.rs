@@ -28,10 +28,31 @@ fn main() {
                 .expect("Port belegt?");
             println!("TI4-Hub-API auf Port {port}, Daten in {path}");
             axum::serve(listener, app)
-                .with_graceful_shutdown(async {
-                    let _ = tokio::signal::ctrl_c().await;
-                })
+                .with_graceful_shutdown(shutdown())
                 .await
                 .expect("Server");
         });
+}
+
+/// Strg+C lokal, SIGTERM von `docker stop`. Als PID 1 im Container ignoriert der Prozess SIGTERM sonst.
+async fn shutdown() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+    #[cfg(unix)]
+    let term = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut s) => {
+                s.recv().await;
+            }
+            Err(_) => std::future::pending::<()>().await,
+        }
+    };
+    #[cfg(not(unix))]
+    let term = std::future::pending::<()>();
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = term => {},
+    }
+    println!("TI4-Hub-API beendet");
 }
