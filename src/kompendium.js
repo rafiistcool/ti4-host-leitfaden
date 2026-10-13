@@ -100,78 +100,117 @@
           f.leaders.commander.en, f.leaders.commander.text, f.leaders.hero.en, f.leaders.hero.text, f.promissory.en, f.promissory.text]);
         return '<a class="fcard kf-item" id="' + id + '" href="#f-' + f.id + '"><span class="thumb">' + hexThumb(f, 64) + "</span>" +
           '<span class="body"><span class="nm">' + esc(nm(f)) + "</span>" + (f.de ? '<span class="en">' + esc(f.en) + "</span>" : "") +
-          '<span class="meta">' + dots(f.complexity) + " " + esc(COMPLEX[f.complexity]) + " · " + f.home.map(function (p) { return esc(p.name) + " " + p.res + "/" + p.inf; }).slice(0, 2).join(", ") + (f.home.length > 2 ? " …" : "") + "</span>" +
-          '<span class="ds">' + esc(f.play) + "</span></span></a>";
+          '<span class="meta">' + dots(f.complexity) + " " + esc(COMPLEX[f.complexity]) + "</span>" +
+          '<span class="ds">' + esc(f.play) + "</span></span>" +
+          '<span class="comm" title="Massenprodukte"><b>' + f.commodities + "</b></span></a>";
       }).join("") + "</div></section>";
     });
     return h + emptyNote() + '<p class="fine">Deutsche Namen stehen da, wo die deutsche Ausgabe sie im Regelheft verwendet, sonst der englische Originalname. Bei Abweichungen gilt der Kartentext.</p>';
   }
   function dots(n) { var s = ""; for (var i = 1; i <= 3; i++) s += '<i class="dot' + (i <= n ? " on" : "") + '"></i>'; return '<span class="cx" title="Komplexität ' + n + ' von 3">' + s + "</span>"; }
 
+  /* ---------- Fraktionsbogen ---------- */
+  var techByName = {}; TECHS.forEach(function (t) { techByName[U0n(t.en)] = t; if (t.de) techByName[U0n(t.de)] = t; });
+  function U0n(s) { return String(s).toLowerCase().replace(/[^a-z0-9äöüß]/g, ""); }
+  var sheetSide = "front";
+  function statline(o) {
+    var cells = [["Kosten", o.cost], ["Kampf", o.combat], ["Bewegung", o.move], ["Kapazität", o.capacity]].filter(function (c) { return c[1] !== undefined; });
+    return '<div class="fs-stats">' + cells.map(function (c) { return "<span><b>" + esc(c[1]) + "</b>" + esc(c[0]) + "</span>"; }).join("") + "</div>";
+  }
+  function startUnits(txt) {
+    return '<div class="fs-units">' + String(txt).split(/,\s*/).map(function (part) {
+      var m = /^(\d+)\s+(.+)$/.exec(part.trim());
+      return m ? '<span class="u"><b>' + m[1] + "</b>" + esc(m[2]) + "</span>" : '<span class="u wide">' + esc(part) + "</span>";
+    }).join("") + "</div>";
+  }
+  function startTechs(list) {
+    if (!list.length) return '<p class="fs-none">keine</p>';
+    return '<div class="fs-techs">' + list.map(function (n) {
+      var t = techByName[U0n(n)];
+      return '<span class="t' + (t ? " c-" + t.color : "") + '">' + (t ? '<i class="sw"></i>' : "") + esc(n) + "</span>";
+    }).join("") + "</div>";
+  }
+  function gcard(o) {
+    // Karte aus dem Spielbereich: farbiges Band mit Art und Zustand, darunter Name und Text
+    return '<article class="gcard' + (o.cls ? " " + o.cls : "") + '"><div class="band"><span>' + o.kind + "</span>" + (o.state ? '<span class="st">' + o.state + "</span>" : "") + "</div>" +
+      '<div class="gc-b"><div class="kc-h"><h3>' + esc(o.title) + "</h3>" + (o.en ? '<span class="en">' + esc(o.en) + "</span>" : "") + (o.tags || "") + "</div>" + (o.body || "") + "</div></article>";
+  }
+
   function viewFaction(id) {
     var f = facById[id];
+    var back_ = sheetSide === "back";
     var h = back("#fraktionen", "Fraktionen");
-    h += '<div class="fhead"><div class="fh-tile">' + hexThumb(f, 150, true) + "</div><div>" +
-      '<p class="eyebrow">' + esc(SRC_LONG[f.src]) + "</p><h1>" + esc(nm(f)) + "</h1>" + (f.de ? '<p class="en-sub">' + esc(f.en) + "</p>" : "") + "</div></div>";
-    h += '<p class="lead">' + esc(f.play) + "</p>";
-    h += '<div class="kv">' +
-      "<div><b>" + dots(f.complexity) + "</b><span>Komplexität: " + esc(COMPLEX[f.complexity]) + "</span></div>" +
-      "<div><b>" + f.commodities + "</b><span>Massenprodukte (Maximum)</span></div>" +
-      "<div><b>" + esc(f.homeTile) + "</b><span>Systemtafel Heimat" + (f.gateTile ? ", Tor von Creuss: Tafel " + esc(f.gateTile) : "") + "</span></div>" +
-      "<div><b>" + f.home.reduce(function (a, p) { return a + p.res; }, 0) + "/" + f.home.reduce(function (a, p) { return a + p.inf; }, 0) + "</b><span>Ressourcen/Einfluss im Heimat-System" + (f.home.some(function (p) { return p.via; }) ? " (alle Herkünfte)" : "") + "</span></div></div>";
-    var secs = [["k-abil", "Fähigkeiten"], ["k-start", "Start"], ["k-units", "Einheiten"], ["k-tech", "Technologien"], ["k-lead", "Anführer"], ["k-prom", "Vertrag"]];
-    h += '<nav class="jump" aria-label="Abschnitte">' + secs.map(function (s) { return '<button type="button" class="chip" data-act="kjump" data-to="' + s[0] + '">' + s[1] + "</button>"; }).join("") + "</nav>";
 
-    // Fähigkeiten
-    h += '<section id="k-abil"><h2>Fraktionsfähigkeiten</h2><div class="kgrid">' + f.abilities.map(function (a) {
-      return kc({ title: nm(a), en: enIf(a), body: para(a.text) + codexNote(a.codex) });
-    }).join("") + "</div></section>";
+    // Vorderseite
+    var front = '<header class="fs-head"><div class="fs-emblem">' + hexThumb(f, 96) + "</div>" +
+      '<div class="fs-title"><p class="fs-src">' + esc(SRC_LONG[f.src]) + "</p><h1>" + esc(nm(f)) + "</h1>" + (f.de ? '<p class="fs-en">' + esc(f.en) + "</p>" : "") + "</div>" +
+      '<div class="fs-comm" title="Massenprodukte"><b>' + f.commodities + "</b><span>Massen&shy;produkte</span></div></header>" +
+      '<div class="fs-abil">' + f.abilities.map(function (a) {
+        return '<div class="fs-ab"><h3>' + esc(nm(a)) + (enIf(a) ? ' <span class="en">' + esc(enIf(a)) + "</span>" : "") + "</h3>" + para(a.text) + codexNote(a.codex) + "</div>";
+      }).join("") + "</div>" +
+      '<div class="fs-flag"><div class="fs-flag-h"><div><p class="fs-lbl">Flaggschiff</p><h3>' + esc(nm(f.flagship)) + "</h3></div>" + statline(f.flagship) + "</div>" +
+      para(f.flagship.text) + codexNote(f.flagship.codex) +
+      (f.flagship.upgrade ? '<div class="fs-upg"><div class="fs-flag-h"><div><p class="fs-lbl">Aufgewertet ' + prereq(f.flagship.upgrade.prereq) + "</p><h3>" + esc(nm(f.flagship.upgrade)) + "</h3></div>" + statline(f.flagship.upgrade) + "</div>" + para(f.flagship.upgrade.text) + "</div>" : "") +
+      "</div>" +
+      '<p class="fs-cx">Komplexität ' + dots(f.complexity) + " " + esc(COMPLEX[f.complexity]) + "</p>";
 
-    // Heimat und Start
+    // Rückseite
     var homeRows = f.home.map(function (p) {
-      return '<li><b>' + esc(p.name) + '</b> <span class="ri"><span class="r">' + p.res + '</span><span class="i">' + p.inf + "</span></span>" + (p.via ? ' <span class="muted">über ' + esc(p.via) + "</span>" : "") + "</li>";
+      return '<li><b>' + esc(p.name) + '</b> <span class="ri"><span class="r">' + p.res + '</span><span class="i">' + p.inf + "</span></span>" + (p.via ? ' <span class="via">' + esc(p.via) + "</span>" : "") + "</li>";
     }).join("");
-    h += '<section id="k-start"><h2>Heimat-System und Start</h2><div class="kgrid">' +
-      kc({ kind: "Heimat-System", title: f.home.map(function (p) { return p.name; }).join(" · "), body: '<ul class="planets">' + homeRows + "</ul>" +
-        (f.gateTile ? "<p>Das Tor von Creuss (Tafel " + esc(f.gateTile) + ") liegt auf dem Heimatplatz in der Galaxie, das eigentliche Heimat-System daneben.</p>" : "") +
-        (f.id === "keleres" ? "<p>Je nach gewählter Herkunft das Heimat-System von Mentak (Tafel 2), Xxcha (Tafel 14) oder Argent (Tafel 58).</p>" : "") }) +
-      kc({ kind: "Start", title: "Starteinheiten", body: "<p>" + esc(f.start.units) + "</p>" + '<p class="sub-k">Starttechnologie</p><p>' + (f.start.tech.length ? f.start.tech.map(esc).join(", ") : "keine") + "</p>" }) +
-      "</div></section>";
+    var backSide = '<header class="fs-head small"><div class="fs-title"><p class="fs-src">Rückseite, für den Aufbau</p><h2>' + esc(nm(f)) + "</h2></div></header>" +
+      '<div class="fs-home"><div class="fs-hometile">' + hexThumb(f, 170, true) + "</div><div>" +
+      '<p class="fs-lbl">Heimat-System' + (D.tiles[f.homeTile] ? ", Tafel " + esc(f.homeTile) : "") + "</p>" +
+      '<ul class="planets">' + homeRows + "</ul>" +
+      (f.gateTile ? '<p class="fs-note">In die Galaxie kommt das Tor von Creuss (Tafel ' + esc(f.gateTile) + "). Das Heimat-System liegt neben dem Spielplan.</p>" : "") +
+      (f.id === "keleres" ? '<p class="fs-note">Heimat-System der gewählten Herkunft: Mentak (Tafel 2), Xxcha (Tafel 14) oder Argent (Tafel 58).</p>' : "") +
+      "</div></div>" +
+      '<div class="fs-block"><p class="fs-lbl">Starteinheiten</p>' + startUnits(f.start.units) + "</div>" +
+      '<div class="fs-block"><p class="fs-lbl">Starttechnologien</p>' + startTechs(f.start.tech) + "</div>" +
+      '<p class="fs-note">Dazu wie bei allen: 3 Kommandomarker in den Taktikpool, 3 in den Flottenpool, 2 in den Strategiepool.</p>';
 
-    // Einheiten
-    var u = [];
-    u.push(kc({ kind: "Flaggschiff", title: nm(f.flagship), en: enIf(f.flagship), cls: "unit",
-      body: stats(f.flagship) + para(f.flagship.text) + codexNote(f.flagship.codex) + upgrade(f.flagship.upgrade) }));
-    u.push(kc({ kind: "Mech", title: nm(f.mech), en: enIf(f.mech), cls: "unit", body: stats(f.mech) + para(f.mech.text) + codexNote(f.mech.codex) }));
-    (f.units || []).forEach(function (x) {
-      u.push(kc({ kind: "Sondereinheit statt " + esc(x.replaces), title: nm(x), en: enIf(x), cls: "unit", body: stats(x) + para(x.text) + codexNote(x.codex) + upgrade(x.upgrade) }));
-    });
-    h += '<section id="k-units"><h2>Einheiten</h2><div class="kgrid">' + u.join("") + "</div></section>";
+    h += '<div class="fs-bar" role="group" aria-label="Seite des Fraktionsbogens">' +
+      '<button type="button" data-act="fs-side" data-side="front" aria-pressed="' + !back_ + '">Vorderseite</button>' +
+      '<button type="button" data-act="fs-side" data-side="back" aria-pressed="' + back_ + '">Rückseite und Start</button></div>' +
+      '<div class="fsheet" id="fsheet" data-side="' + sheetSide + '"><div class="fs-inner">' +
+      '<section class="fs-face fs-front" aria-label="Vorderseite"' + (back_ ? " inert" : "") + ">" + front + "</section>" +
+      '<section class="fs-face fs-back" aria-label="Rückseite"' + (back_ ? "" : " inert") + ">" + backSide + "</section>" +
+      "</div></div>";
+    h += '<p class="fs-play">' + esc(f.play) + "</p>";
 
-    // Technologien
-    h += '<section id="k-tech"><h2>Fraktionstechnologien</h2><div class="kgrid">' + f.techs.map(function (t) {
-      return kc({ cls: "tech c-" + t.color, title: nm(t), en: enIf(t), tags: '<span class="tc">' + esc(COLOR[t.color] || t.color) + "</span>" + prereq(t.prereq), body: para(t.text) + codexNote(t.codex) });
-    }).join("") + "</div></section>";
-
-    // Anführer
+    // Spielbereich
     var L = f.leaders, lead = [];
-    L.agents.forEach(function (a) { lead.push(kc({ kind: "Agent" + (a.title ? " · " + esc(a.title) : ""), title: nm(a), en: enIf(a), cls: "leader", body: para(a.text) + codexNote(a.codex) })); });
-    lead.push(kc({ kind: "Commander", title: nm(L.commander), en: enIf(L.commander), cls: "leader",
+    var lockSt = '<i class="lock" aria-hidden="true"></i>gesperrt';
+    L.agents.forEach(function (a) {
+      lead.push(gcard({ cls: "leader agent", kind: "Agent" + (a.title ? ", " + esc(a.title) : ""), state: '<i class="ready" aria-hidden="true"></i>spielbereit', title: nm(a), en: enIf(a), body: para(a.text) + codexNote(a.codex) }));
+    });
+    lead.push(gcard({ cls: "leader", kind: "Commander", state: lockSt, title: nm(L.commander), en: enIf(L.commander),
       body: '<p class="unlock"><b>Freischalten:</b> ' + md(L.commander.unlock || "") + "</p>" + para(L.commander.text) + codexNote(L.commander.codex) }));
-    lead.push(kc({ kind: "Held", title: nm(L.hero), en: enIf(L.hero), cls: "leader",
-      body: '<p class="unlock"><b>Freischalten:</b> 3 gewertete Aufträge.</p>' + para(L.hero.text) + codexNote(L.hero.codex) }));
-    h += '<section id="k-lead"><h2>Anführer</h2><p class="fine">Der Agent ist von Anfang an spielbereit. Commander und Held werden freigeschaltet und liegen bis dahin gesperrt. Ein Held wird nach seiner Fähigkeit vernichtet.</p><div class="kgrid">' + lead.join("") + "</div></section>";
+    lead.push(gcard({ cls: "leader hero", kind: "Held", state: lockSt, title: nm(L.hero), en: enIf(L.hero),
+      body: '<p class="unlock"><b>Freischalten:</b> 3 gewertete Aufträge. Nach Gebrauch vernichtet.</p>' + para(L.hero.text) + codexNote(L.hero.codex) }));
 
-    // Vertrag
-    h += '<section id="k-prom"><h2>Fraktions-Vertragskarte</h2><div class="kgrid">' +
-      kc({ kind: "Vertrag", title: nm(f.promissory), en: enIf(f.promissory), body: para(f.promissory.text) + codexNote(f.promissory.codex) }) + "</div></section>";
+    var units = [gcard({ cls: "unit", kind: "Mech", state: "Kosten " + esc(f.mech.cost), title: nm(f.mech), en: enIf(f.mech), body: statline(f.mech) + para(f.mech.text) + codexNote(f.mech.codex) })];
+    (f.units || []).forEach(function (x) {
+      units.push(gcard({ cls: "unit", kind: "Statt " + esc(x.replaces), title: nm(x), en: enIf(x), body: statline(x) + para(x.text) + codexNote(x.codex) + upgrade(x.upgrade) }));
+    });
+
+    h += '<section class="playarea" aria-label="Spielbereich"><h2>Spielbereich</h2>' +
+      '<p class="fine">Was neben dem Bogen liegt: Anführerbogen, Mech und Sondereinheiten, die zwei Fraktionstechnologien und die eigene Vertragskarte.</p>' +
+      '<h3 class="pa-h">Anführer</h3><div class="pa-row leaders">' + lead.join("") + "</div>" +
+      '<h3 class="pa-h">Einheiten</h3><div class="pa-row">' + units.join("") + "</div>" +
+      '<h3 class="pa-h">Fraktionstechnologien</h3><div class="pa-row">' + f.techs.map(function (t) {
+        return gcard({ cls: "techc c-" + t.color, kind: esc(COLOR[t.color] || t.color), state: prereq(t.prereq), title: nm(t), en: enIf(t), body: para(t.text) + codexNote(t.codex) });
+      }).join("") + "</div>" +
+      '<h3 class="pa-h">Vertragskarte</h3><div class="pa-row">' +
+      gcard({ cls: "prom", kind: "Vertrag", state: "nur für andere Spieler", title: nm(f.promissory), en: enIf(f.promissory), body: para(f.promissory.text) + codexNote(f.promissory.codex) }) +
+      "</div></section>";
 
     // Originale
     var ult = ULTIMATE[f.id];
-    h += '<div class="card origs"><h3>Originalkarten ansehen</h3><p>Die Bilder der echten Karten und Bögen sind urheberrechtlich geschützt und darum hier nicht eingebunden. So findest du sie:</p><div class="links">' +
+    h += '<div class="card origs"><h3>Originalkarten ansehen</h3><p>Die echten Bögen und Karten sind urheberrechtlich geschützt und deshalb hier nachgebaut statt abgebildet.</p><div class="links">' +
       (ult ? '<a class="btn" href="https://ti4ultimate.com/game/factions?faction=' + ult + '" target="_blank" rel="noopener">' + U().svg("ext", 18) + "TI4 Ultimate</a>" : "") +
       '<a class="btn" href="https://twilight-imperium.fandom.com/wiki/Special:Search?query=' + encodeURIComponent(f.en) + '" target="_blank" rel="noopener">' + U().svg("ext", 18) + "Twilight Imperium Wiki</a></div>" +
-      '<p class="fine">Beide Seiten sind englisch. Der eigene Fraktionsbogen aus der Schachtel ist natürlich die beste Quelle.</p></div>';
+      '<p class="fine">Beide Seiten sind englisch.</p></div>';
 
     // Blättern
     var order = FAC.slice().sort(function (a, b) { return a.short.localeCompare(b.short, "de"); });
@@ -332,9 +371,13 @@
       if (r.focusEl) { var el = document.getElementById(r.focusEl); if (el) { el.classList.add("flash"); if (el.hidden) { filterQ[key] = ""; var inp = document.getElementById("kf"); if (inp) inp.value = ""; applyFilter(""); } } }
     },
     click: function (a, t) {
-      if (a === "kjump") {
-        var el = document.getElementById(t.getAttribute("data-to"));
-        if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - document.getElementById("top").offsetHeight - 10);
+      if (a === "fs-side") {
+        sheetSide = t.getAttribute("data-side");
+        var sh = document.getElementById("fsheet"); if (!sh) return true;
+        sh.setAttribute("data-side", sheetSide);
+        sh.querySelector(".fs-front").inert = sheetSide === "back";
+        sh.querySelector(".fs-back").inert = sheetSide !== "back";
+        document.querySelectorAll('[data-act="fs-side"]').forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-side") === sheetSide)); });
         return true;
       }
       if (a === "agenda-all") { agendaAll = t.getAttribute("data-v") === "1"; U().rerender(); return true; }
