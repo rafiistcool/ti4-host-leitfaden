@@ -111,7 +111,7 @@
     var steps = PH[st.p].steps;
     if (st.s < steps.length - 1) { setPos(st.p, st.s + 1); return; }
     var n = nextPhaseIndex();
-    if (n === -1) { st.round += 1; setPos(0, 0); clearChecks(["raumkampf", "einmarsch", "taktik", "handel"]); return; }
+    if (n === -1) { st.round += 1; setPos(0, 0); clearChecks(["raumkampf", "einmarsch", "taktik", "handel"]); darfSt = {}; return; }
     setPos(n, 0);
   }
   function goPrev() {
@@ -146,9 +146,137 @@
     return t ? '<a class="chip" href="#t-' + t.id + '">' + esc(t.name) + " ›</a>" : "";
   }
 
+  /* ---------- Darf ich das? (Daten: data/darfich.js) ---------- */
+  var DARF = D.darf || { sets: [], kinds: {} };
+  var darfSetById = {}; DARF.sets.forEach(function (s) { darfSetById[s.id] = s; });
+  var darfSt = {};          // Set-ID -> { id: Prüfung oder null, a: ["ja"|"nein", …] }, nur im Speicher
+  var pendingReveal = null; // Element-ID, die nach dem nächsten Rendern ins Bild gescrollt wird
+  var KIND_ICON = {
+    ok: "M5 12.5 L10 17 L19 7", no: "M7 7 L17 17 M17 7 L7 17", cond: "M12 5.5 V13.5 M12 18.2 V18.3",
+    must: "M5 12 H19 M13 6 L19 12 L13 18", skip: "M6 12 H18"
+  };
+  function pathSvg(d, size, sw) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (sw || 2) +
+      '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + esc(d) + '"/></svg>';
+  }
+  function darfChecks(set) { return set.groups.reduce(function (all, g) { return all.concat(g.checks); }, []); }
+  function darfCheck(set, id) { return darfChecks(set).filter(function (c) { return c.id === id; })[0] || null; }
+  function darfState(setId) { return darfSt[setId] || (darfSt[setId] = { id: null, a: [] }); }
+  /* Wertet die Antworten aus: Spur der beantworteten Fragen, Ergebnis oder Index der offenen Frage. */
+  function darfEval(c, answers) {
+    var trail = [], verdict = null, qi = -1;
+    for (var i = 0; i < c.qs.length; i++) {
+      if (i >= answers.length) { qi = i; break; }
+      var q = c.qs[i], yes = answers[i] === "ja", hit = (yes ? q.yes : q.no) || null;
+      trail.push({ q: q, yes: yes, hit: hit });
+      if (hit) { verdict = hit; break; }
+    }
+    if (!verdict && qi === -1 && c.ok) verdict = Object.assign({ kind: "ok" }, c.ok);
+    return { trail: trail, verdict: verdict, qi: qi };
+  }
+  function darfStepPos(setId) {
+    for (var p = 0; p < PH.length; p++) for (var s = 0; s < PH[p].steps.length; s++) if (PH[p].steps[s].darf === setId) return { p: p, s: s };
+    return null;
+  }
+  /* Themen-Seite, auf der das Panel als Block steht. Ziel für Suche und Verweise, damit der Ablauf an seiner Stelle bleibt. */
+  function darfTopicHash(setId) {
+    for (var i = 0; i < TOPICS.length; i++) {
+      if (TOPICS[i].blocks.some(function (b) { return b.darf === setId; })) return TOPICS[i].id === "kampf" ? "kampf" : "t-" + TOPICS[i].id;
+    }
+    return "kampf";
+  }
+  function darfHref(setId) { return "#" + darfTopicHash(setId); }
+
+  /* level: Überschriftenebene des Panels (2 im Ablauf unter h1, 4 in Themen unter h3). */
+  function darfPanel(setId, level) {
+    var set = darfSetById[setId];
+    if (!set) return "";
+    var stt = darfState(setId), c = stt.id ? darfCheck(set, stt.id) : null;
+    var pre = "darf-" + setId, hl = "h" + (level || 2);
+    var h = '<section class="darf" id="' + pre + '" data-level="' + (level || 2) + '" aria-labelledby="' + pre + '-h">' +
+      '<div class="darf-head"><' + hl + ' id="' + pre + '-h">Darf ich das?<span class="sr"> ' + esc(set.name) + "</span></" + hl + "><span>" + (c ? esc(set.name) + ": " + esc(c.name) : "Tippe, was du vorhast") + "</span></div>";
+    if (set.steps) {
+      h += '<div class="darf-strip"><span class="k" id="' + pre + '-sk">' + esc(set.stepsTitle || "Ablauf") + '</span><ol aria-labelledby="' + pre + '-sk">' +
+        set.steps.map(function (t, i) {
+          var on = c && c.at && c.at.indexOf(i + 1) > -1;
+          return "<li" + (on ? ' class="on" aria-current="step"' : "") + '><span class="n">' + (i + 1) + "</span><span>" + esc(t) + "</span></li>";
+        }).join("") + "</ol>" + (c && c.hint ? '<p class="hint">' + esc(c.hint) + "</p>" : "") + "</div>";
+    }
+    set.groups.forEach(function (g, gi) {
+      if (set.groups.length > 1) h += '<p class="darf-gk">' + esc(g.name) + "</p>";
+      h += '<div class="darf-tiles" style="--n:' + g.checks.length + '">' + g.checks.map(function (x) {
+        var on = c && c.id === x.id;
+        return '<button type="button" class="darf-tile" data-act="darf-pick" data-set="' + setId + '" data-id="' + x.id + '" aria-pressed="' + (on ? "true" : "false") + '">' +
+          pathSvg(x.icon, 22, 1.8) + "<span>" + esc(x.label) + "</span></button>";
+      }).join("") + "</div>";
+      if (setId === "aktion" && gi === 0) {
+        h += '<div class="darf-more">' + [["raumkampf", "Schritt 3: Raumkampf prüfen", "kampf"], ["einmarsch", "Schritt 4: Einmarsch prüfen", "erobern"]].filter(function (m) { return darfSetById[m[0]]; }).map(function (m) {
+          var ic = darfCheck(darfSetById[m[0]], m[2]);
+          return '<a class="darf-link" href="' + darfHref(m[0]) + '" data-act="darf-goto" data-set="' + m[0] + '">' + (ic ? pathSvg(ic.icon, 20, 1.8) : "") +
+            "<span>" + esc(m[1]) + '</span><span class="arr" aria-hidden="true">›</span></a>';
+        }).join("") + "</div>";
+      }
+    });
+    if (c) h += darfCheckHtml(setId, c, stt.a);
+    return h + "</section>";
+  }
+
+  function darfCheckHtml(setId, c, answers) {
+    var r = darfEval(c, answers), pre = "darf-" + setId;
+    var h = '<div class="darf-check"><div class="darf-ch"><div><div class="nm">' + esc(c.name) + '</div><div class="st">' + esc(c.step) + '</div></div><span class="ref">' + esc(c.ref) + "</span></div>";
+    if (r.trail.length) {
+      h += '<div class="darf-trail">' + r.trail.map(function (t, i) {
+        var kind = t.hit ? t.hit.kind : "ok", ans = t.yes ? "Ja" : "Nein";
+        return '<button type="button" data-act="darf-back" data-set="' + setId + '" data-i="' + i + '" aria-label="Antwort ändern: ' + esc(t.q.s) + " " + ans + '">' +
+          '<span class="darf-dot k-' + kind + '">' + pathSvg(KIND_ICON[kind], 14, 3) + '</span><span class="tx">' + esc(t.q.s) + '</span><span class="a">' + ans + "</span></button>";
+      }).join("") + "</div>";
+    }
+    if (r.qi > -1) {
+      var q = c.qs[r.qi];
+      h += '<div class="darf-q" id="' + pre + '-focus" tabindex="-1" role="group" aria-labelledby="' + pre + '-qn ' + pre + '-qq">' +
+        '<p class="n" id="' + pre + '-qn">Frage ' + (r.qi + 1) + " von " + c.qs.length + '</p><p class="q" id="' + pre + '-qq">' + esc(q.q) + "</p>" +
+        (q.help ? '<p class="help">' + esc(q.help) + "</p>" : "") +
+        '<div class="yn"><button type="button" data-act="darf-ans" data-set="' + setId + '" data-v="ja">Ja</button>' +
+        '<button type="button" data-act="darf-ans" data-set="' + setId + '" data-v="nein">Nein</button></div></div>';
+    } else if (r.verdict) {
+      var v = r.verdict;
+      h += '<div class="darf-v k-' + v.kind + '" id="' + pre + '-focus" tabindex="-1" role="status">' +
+        '<div class="vh"><span class="darf-dot big">' + pathSvg(KIND_ICON[v.kind], 22, 2.6) + "</span><b>" + esc(DARF.kinds[v.kind] || "") + "</b></div>" +
+        "<p>" + esc(v.text) + "</p>" +
+        (v.notes && v.notes.length ? '<div class="notes"><span class="k">Denk daran</span><ul>' + v.notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul></div>" : "") +
+        '<div class="vf"><span class="ref">' + esc(v.ref || c.ref) + '</span><button type="button" data-act="darf-reset" data-set="' + setId + '">' + svg("reset", 18) + "Neu prüfen</button></div></div>";
+    }
+    return h + "</div>";
+  }
+
+  /* Nur das Panel neu zeichnen, damit die Seite nicht springt. Danach Fokus auf Frage oder Ergebnis. */
+  function darfRefresh(setId, focusSel) {
+    var el = document.getElementById("darf-" + setId);
+    if (!el) { render(false); return; }
+    el.outerHTML = darfPanel(setId, +el.getAttribute("data-level") || 2);
+    var f = document.querySelector(focusSel || "#darf-" + setId + "-focus");
+    if (f) { try { f.focus({ preventScroll: true }); } catch (e) { f.focus(); } reveal(f); }
+  }
+  function reveal(el) {
+    var r = el.getBoundingClientRect(), topH = document.getElementById("top").offsetHeight;
+    var dock = document.querySelector(".dock"), bottom = window.innerHeight - (dock ? dock.offsetHeight : 0);
+    if (r.top < topH + 8) window.scrollBy(0, r.top - topH - 8);
+    else if (r.bottom > bottom - 8) window.scrollBy(0, Math.min(r.bottom - bottom + 8, r.top - topH - 8));
+  }
+  /* Zu einem Panel springen (aus der Suche oder vom Aktion-Panel), optional mit gewählter Prüfung. */
+  function darfOpen(setId, checkId) {
+    if (!darfSetById[setId]) return;
+    if (checkId) darfSt[setId] = { id: checkId, a: [] };
+    pendingReveal = "darf-" + setId;
+    var pos = darfStepPos(setId);
+    if (pos && st.p === pos.p && st.s === pos.s) go("ablauf");
+    else go(darfTopicHash(setId));
+  }
+
   /* ---------- Blöcke rendern ---------- */
   function blocks(list) { return list.map(block).join(""); }
   function block(b) {
+    if (b.darf) return darfPanel(b.darf, b.level || 4);
     if (b.h) return '<h3 class="bh">' + md(b.h) + "</h3>";
     if (b.p) return "<p>" + md(b.p) + "</p>";
     if (b.ul) return '<ul class="plain">' + b.ul.map(function (x) { return "<li>" + md(x) + "</li>"; }).join("") + "</ul>";
@@ -199,6 +327,7 @@
       '<p class="step-body">' + md(step.b) + "</p>";
     if (step.say) h += '<div class="say">' + svg("say", 24) + '<div><div class="k">Ansage an den Tisch</div><div class="v">„' + md(step.say) + "“</div></div></div>";
     if (step.warn) h += '<div class="note warn"><p><b>Achtung:</b> ' + md(step.warn) + "</p></div>";
+    if (step.darf) h += darfPanel(step.darf, 2);
     if (step.refs && step.refs.length) h += '<div class="chips"><span class="k">Dazu nachschlagen</span>' + step.refs.map(refChip).join("") + "</div>";
     if (st.p === 2 && st.s === total - 1 && !st.cust) h += '<p class="locked-note">Der Hütermarker liegt noch auf Mecatol Rex, darum folgt keine Agendaphase. Wird er entfernt, oben umschalten.</p>';
     h += '<div class="allsteps"><span class="k">' + esc(ph.name) + " · alle Schritte</span>" + ph.steps.map(function (x, j) {
@@ -301,7 +430,7 @@
   function collect(o, out) {
     if (typeof o === "string") out.push(o);
     else if (Array.isArray(o)) o.forEach(function (x) { collect(x, out); });
-    else if (o && typeof o === "object") Object.keys(o).forEach(function (k) { if (k !== "icon" && k !== "check" && k !== "id" && k !== "kind") collect(o[k], out); });
+    else if (o && typeof o === "object") Object.keys(o).forEach(function (k) { if (k !== "icon" && k !== "check" && k !== "id" && k !== "kind" && k !== "darf" && k !== "at") collect(o[k], out); });
     return out;
   }
   function buildIndex() {
@@ -319,6 +448,12 @@
     });
     D.rules.forEach(function (r) {
       INDEX.push({ ty: "Regel Nr. " + r.nr, t: r.t, txt: [r.en, r.k || "", collect(r.x, []).join(" ")].join(" "), href: "#r-" + r.id, w: 3 });
+    });
+    DARF.sets.forEach(function (set) {
+      darfChecks(set).forEach(function (c) {
+        INDEX.push({ ty: "Darf ich das? · " + set.name, t: c.name, txt: [c.label.replace(/­/g, ""), c.step, collect(c.qs, []).join(" "), collect(c.ok || {}, []).join(" ")].join(" "),
+          darf: set.id, id: c.id, href: darfHref(set.id), w: 4 });
+      });
     });
     EXT.forEach(function (x) { if (x.index) x.index(function (e) { INDEX.push(e); }, collect); });
     INDEX.forEach(function (e) { e.nt = norm(e.t); e.nx = norm(e.txt); });
@@ -368,7 +503,8 @@
     if (!r.list.length) { box.innerHTML = '<p class="empty">Nichts gefunden für „' + esc(searchQ.trim()) + "“. Tipp: Umlaute gehen auch als ae, oe, ue, englische Begriffe funktionieren auch.</p>"; return; }
     box.innerHTML = '<p class="section-k">' + r.list.length + (r.list.length === 40 ? "+" : "") + " Treffer</p>" + r.list.map(function (x) {
       var e = x.e;
-      var attrs = e.act ? 'href="#ablauf" data-act="jump" data-p="' + e.p + '" data-s="' + e.s + '"' : 'href="' + e.href + '"';
+      var attrs = e.act ? 'href="#ablauf" data-act="jump" data-p="' + e.p + '" data-s="' + e.s + '"' :
+        e.darf ? 'href="' + e.href + '" data-act="darf-open" data-set="' + e.darf + '" data-id="' + e.id + '"' : 'href="' + e.href + '"';
       return '<a class="res" ' + attrs + '><span class="ty">' + esc(e.ty) + '</span><span class="tt">' + highlight(esc(plain(e.t)), r.words) + '</span><span class="sn">' + highlight(snippet(e.txt, r.words), r.words) + "</span></a>";
     }).join("");
   }
@@ -517,6 +653,16 @@
     var topH = document.getElementById("top").offsetHeight;
     document.documentElement.style.setProperty("--top-h", topH + "px");
     if (route.v === "ext" && route.x.after) route.x.after(route);
+    if (pendingReveal) {
+      var pe = document.getElementById(pendingReveal);
+      pendingReveal = null;
+      if (pe) {
+        window.scrollTo(0, Math.max(0, pe.getBoundingClientRect().top + window.scrollY - topH - 12));
+        var pf = document.getElementById(pe.id + "-focus");
+        if (pf) { try { pf.focus({ preventScroll: true }); } catch (e) { pf.focus(); } reveal(pf); }
+        return;
+      }
+    }
     if (scroll) {
       var fid = route.v === "regeln" && route.focus ? "r-" + route.focus : (route.v === "ext" && route.focusEl);
       if (fid) {
@@ -534,13 +680,22 @@
     if (!t) return;
     var a = t.getAttribute("data-act");
     for (var x = 0; x < EXT.length; x++) if (EXT[x].click && EXT[x].click(a, t, ev)) return;
-    if (a === "next") { goNext(); rerenderAblauf(); }
+    if (a === "darf-pick") {
+      var ds = t.getAttribute("data-set"), did = t.getAttribute("data-id"), dst = darfState(ds);
+      if (dst.id === did) { darfSt[ds] = { id: null, a: [] }; darfRefresh(ds, '#darf-' + ds + ' [data-id="' + did + '"]'); }
+      else { darfSt[ds] = { id: did, a: [] }; darfRefresh(ds); }
+    }
+    else if (a === "darf-ans") { var ds2 = t.getAttribute("data-set"); darfState(ds2).a.push(t.getAttribute("data-v") === "ja" ? "ja" : "nein"); darfRefresh(ds2); }
+    else if (a === "darf-back") { var ds3 = t.getAttribute("data-set"), st3 = darfState(ds3); st3.a = st3.a.slice(0, +t.getAttribute("data-i")); darfRefresh(ds3); }
+    else if (a === "darf-reset") { var ds4 = t.getAttribute("data-set"); darfState(ds4).a = []; darfRefresh(ds4); }
+    else if (a === "darf-goto" || a === "darf-open") { ev.preventDefault(); darfOpen(t.getAttribute("data-set"), a === "darf-open" ? t.getAttribute("data-id") : null); }
+    else if (a === "next") { goNext(); rerenderAblauf(); }
     else if (a === "prev") { goPrev(); rerenderAblauf(); }
-    else if (a === "next-turn") { setPos(1, 0); rerenderAblauf(); }
+    else if (a === "next-turn") { setPos(1, 0); darfSt = {}; rerenderAblauf(); }
     else if (a === "phase") { var i = +t.getAttribute("data-i"); if (locked(i)) return; setPos(i, 0); if (route.v !== "ablauf") go("ablauf"); else rerenderAblauf(); }
     else if (a === "step") { setPos(+t.getAttribute("data-p"), +t.getAttribute("data-s")); if (route.v !== "ablauf") go("ablauf"); else rerenderAblauf(); }
     else if (a === "jump") { ev.preventDefault(); setPos(+t.getAttribute("data-p"), +t.getAttribute("data-s")); go("ablauf"); }
-    else if (a === "round+") { st.round += 1; setPos(0, 0); clearChecks(["raumkampf", "einmarsch", "taktik", "handel"]); rerenderAblauf(); }
+    else if (a === "round+") { st.round += 1; setPos(0, 0); clearChecks(["raumkampf", "einmarsch", "taktik", "handel"]); darfSt = {}; rerenderAblauf(); }
     else if (a === "round-") { if (st.round > 1) { st.round -= 1; persist(); render(false); } }
     else if (a === "cust") {
       st.cust = !st.cust;
@@ -560,7 +715,7 @@
         clearTimeout(resetTimer); resetTimer = setTimeout(function () { resetArmed = false; if (route.v === "nachschlagen") render(false); }, 5000);
       } else {
         resetArmed = false; clearTimeout(resetTimer);
-        st = Object.assign({}, DEFAULT); persist(); checks = {}; save("ti4.v2.checks", checks);
+        st = Object.assign({}, DEFAULT); persist(); checks = {}; save("ti4.v2.checks", checks); darfSt = {};
         go("ablauf");
       }
     }

@@ -3,6 +3,7 @@
 Host-Begleiter für **Twilight Imperium: Vierte Edition** mit **Prophezeiung der Könige**, gebaut fürs Handy am Spieltisch und als Web-App installierbar.
 
 - **Ablauf**: führt Schritt für Schritt durch Strategie-, Aktions-, Status- und Agendaphase, mit Ansagen für den Tisch, Warnhinweisen und passenden Regelverweisen. Runde und Hütermarker werden mitgezählt, die Agendaphase schaltet sich erst nach dem Hütermarker frei.
+- **Darf ich das?**: Ja/Nein-Fragen direkt im Ablauf, im Kampf-Tab und unter „Wann darf ich…?“ zeigen, ob eine Handlung regelkonform ist, z. B. Schiffe bewegen, produzieren, landen, passen, handeln, Rückzug, Jägerabwehr, Bombardement oder Bodenkampf. Jedes Ergebnis (erlaubt, nicht erlaubt, nur unter Bedingung, Pflicht, entfällt) nennt die Regelnummer der Living Rules Reference oder die zuständige Karte.
 - **Kampf**: Checklisten für Raumkampf, Einmarsch und Bodenkampf zum Abhaken.
 - **Aufbau**: Spielplan-Schema für 3 bis 8 Spieler mit allen offiziellen Varianten (Hyperrouten, große Galaxie, Alternativen), Tafeln pro Spieler, Legereihenfolge und der komplette Aufbau als Checkliste.
 - **Kartengenerator**: würfelt eine Galaxie mit gezeichneten Systemtafeln, hält Anomalien und gleiche Wurmlöcher auseinander und gleicht die Plätze aus. Dazu Ausgleichstabelle, Liste der Tafeln zum Heraussuchen, Kartencode und teilbarer Link (gleiche Kartennummer ergibt dieselbe Karte).
@@ -183,6 +184,7 @@ src/
   data/reference-assets.js Referenzbilder für das Kompendium
   data/ablauf.js        Schritte der vier Phasen
   data/themen.js        Themen-Seiten fürs Nachschlagen
+  data/darfich.js       „Darf ich das?“-Prüfungen (Fragen, Ergebnisse, LRR-Nummern)
   data/regeln-1.js      Regelreferenz Nr. 1–50
   data/regeln-2.js      Regelreferenz Nr. 51–101
   data/tiles.js         Systemtafeln 1–91 mit Planeten, Anomalien, Wurmlöchern, Hyperrouten

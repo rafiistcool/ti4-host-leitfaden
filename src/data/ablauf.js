@@ -1,4 +1,5 @@
-/* Geführter Rundenablauf. refs: Themen-ID (z. B. "kampf") oder Regel-ID mit Präfix "r:" (z. B. "r:huetermarker"). */
+/* Geführter Rundenablauf. refs: Themen-ID (z. B. "kampf") oder Regel-ID mit Präfix "r:" (z. B. "r:huetermarker").
+   darf: ID eines Sets aus data/darfich.js, dann zeigt der Schritt „Darf ich das?“. */
 window.TI4 = window.TI4 || {};
 TI4.phases = [
   { id: "strategie", name: "Strategiephase", short: "Strategie", steps: [
@@ -23,6 +24,7 @@ TI4.phases = [
     { t: "Genau eine Aktion wählen",
       b: "Strategieaktion, Taktikaktion, Materialaktion oder passen. Mehr als eine Aktion pro Zug gibt es nicht.",
       warn: "Passen erst, wenn die eigene Strategieaktion gemacht ist. Bei 3 oder 4 Spielern müssen beide Karten erschöpft sein.",
+      darf: "aktion",
       refs: ["takt", "kampf", "timing"] },
     { t: "Sekundärfähigkeiten abfragen",
       b: "Nur nach einer Strategieaktion. Reihum ab links vom aktiven Spieler, auch Spieler, die schon gepasst haben. Kostet 1 Marker aus dem Strategiepool, bei Führungsstärke nichts. Danach wird die Strategiekarte erschöpft.",

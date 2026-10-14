@@ -5,6 +5,7 @@
   --line:#d2d8e3; --line-2:#c3cad8;
   --accent:#8f6210; --accent-ink:#6a480b; --accent-soft:#f3e7cf; --mark:#f6df9e;
   --ok:#2c7a4b; --warn:#b4372f; --warn-soft:#f8e3e0; --warn-ink:#7d2620;
+  --ok-soft:#e2f0e7; --ok-ink:#1d5c37; --must:#2f5596; --must-soft:#e1e8f5; --must-ink:#1e3a6e; --skip:#566176; --skip-soft:#e6e9ef; --skip-ink:#3d4659; --on-solid:#ffffff;
   --chrome:#172033; --chrome-2:#24304a; --chrome-line:#2f3a52; --chrome-ink:#e5e9f0; --chrome-muted:#9aa5b8; --chrome-accent:#e3b24e; --chrome-todo:#3a4660;
   --btn:#172033; --btn-ink:#ffffff; --btn-arrow:#e3b24e;
   --sc1:#c0392f; --sc2:#d9711c; --sc3:#b8940f; --sc4:#3b8a38; --sc5:#178c95; --sc6:#3479bd; --sc7:#2a4f9c; --sc8:#7546a3;
@@ -18,6 +19,7 @@
     --line:#283246; --line-2:#36425b;
     --accent:#e3b24e; --accent-ink:#f0c870; --accent-soft:#2e2817; --mark:#5a4612;
     --ok:#5cbf86; --warn:#ef7d72; --warn-soft:#33191a; --warn-ink:#f5b3ab;
+    --ok-soft:#16291f; --ok-ink:#9fdcb7; --must:#7fa6ea; --must-soft:#18233a; --must-ink:#bcd0f4; --skip:#9ba6b9; --skip-soft:#222b3b; --skip-ink:#c9d0dc; --on-solid:#0e131c;
     --chrome:#0a0f18; --chrome-2:#1a2336; --chrome-line:#222c41; --chrome-ink:#e6eaf1; --chrome-muted:#8d98ab; --chrome-accent:#e3b24e; --chrome-todo:#2c3650;
     --btn:#e3b24e; --btn-ink:#172033; --btn-arrow:#172033;
     color-scheme:dark;
@@ -28,6 +30,7 @@
   --line:#283246; --line-2:#36425b;
   --accent:#e3b24e; --accent-ink:#f0c870; --accent-soft:#2e2817; --mark:#5a4612;
   --ok:#5cbf86; --warn:#ef7d72; --warn-soft:#33191a; --warn-ink:#f5b3ab;
+  --ok-soft:#16291f; --ok-ink:#9fdcb7; --must:#7fa6ea; --must-soft:#18233a; --must-ink:#bcd0f4; --skip:#9ba6b9; --skip-soft:#222b3b; --skip-ink:#c9d0dc; --on-solid:#0e131c;
   --chrome:#0a0f18; --chrome-2:#1a2336; --chrome-line:#222c41; --chrome-ink:#e6eaf1; --chrome-muted:#8d98ab; --chrome-accent:#e3b24e; --chrome-todo:#2c3650;
   --btn:#e3b24e; --btn-ink:#172033; --btn-arrow:#172033;
   color-scheme:dark;
@@ -146,6 +149,70 @@ ol.steps li{display:grid;grid-template-columns:30px 1fr;gap:10px;padding:7px 0;b
 ol.steps li:first-child{border-top:0}
 ol.steps li::before{counter-increment:s;content:counter(s);width:26px;height:26px;border-radius:50%;border:1px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-family:var(--f-mono);font-size:13px}
 .bh{margin-top:6px}
+
+/* ---------- Darf ich das? ---------- */
+.darf{display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 14px 16px;scroll-margin-top:calc(var(--top-h,64px) + 12px)}
+.darf-head{display:flex;align-items:baseline;justify-content:space-between;gap:4px 12px;flex-wrap:wrap}
+.darf-head h2,.darf-head h4{margin:0;font-family:var(--f-body);font-size:19px;line-height:1.25;font-weight:700;letter-spacing:0}
+.darf-head span{font-size:14px;color:var(--muted)}
+.darf-gk{margin:2px 0 -4px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.darf-tiles{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:8px}
+.darf-tile{min-height:64px;padding:8px 2px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;font-size:13px;font-weight:600;line-height:1.15;text-align:center;-webkit-hyphens:auto;hyphens:auto;min-width:0}
+.darf-tile svg{color:var(--muted);flex:none}
+.darf-tile:hover{border-color:var(--line-2)}
+.darf-tile[aria-pressed="true"]{background:var(--btn);border-color:var(--btn);color:var(--btn-ink)}
+.darf-tile[aria-pressed="true"] svg{color:var(--btn-arrow)}
+.darf-more{display:flex;flex-direction:column;gap:8px}
+.darf-link{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);text-decoration:none;font-weight:600;font-size:15px}
+.darf-link svg{color:var(--muted);flex:none}
+.darf-link span{flex:1}
+.darf-link .arr{flex:none;color:var(--accent);font-size:20px;line-height:1}
+.darf-strip{display:flex;flex-direction:column;gap:6px}
+.darf-strip .k{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.darf-strip ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.darf-strip li{display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 2px 8px;border-radius:10px;background:var(--surface-2);color:var(--muted);text-align:center;font-size:12px;font-weight:600;line-height:1.15;-webkit-hyphens:auto;hyphens:auto;min-width:0}
+.darf-strip li .n{width:20px;height:20px;border-radius:50%;background:var(--bg);color:var(--ink);display:grid;place-items:center;font-family:var(--f-mono);font-size:11px;font-weight:500}
+.darf-strip li.on{background:var(--btn);color:var(--btn-ink)}
+.darf-strip li.on .n{background:var(--btn-arrow);color:var(--btn)}
+.darf-strip .hint{font-size:14px;line-height:1.4;color:var(--muted)}
+.darf-check{display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:14px}
+.darf-ch{display:flex;align-items:flex-start;gap:10px}
+.darf-ch>div{flex:1;min-width:0}
+.darf-ch .nm{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1.1}
+.darf-ch .st{font-size:13px;color:var(--muted)}
+.darf .ref{flex:none;font-family:var(--f-mono);font-size:12px;font-weight:500;color:var(--muted);padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2)}
+.darf-trail{display:flex;flex-direction:column;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.darf-trail button{display:flex;align-items:center;gap:10px;min-height:46px;padding:8px 12px;border:0;background:none;color:var(--ink);text-align:left;cursor:pointer;font-size:15px;line-height:1.3}
+.darf-trail button + button{border-top:1px solid var(--line)}
+.darf-trail button:hover{background:var(--surface)}
+.darf-trail .tx{flex:1;min-width:0}
+.darf-trail .a{flex:none;font-size:13px;font-weight:700;padding:3px 10px;border-radius:12px;background:var(--bg)}
+.darf-dot{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--kc);color:var(--on-solid)}
+.darf-dot.big{width:40px;height:40px}
+.k-ok{--kc:var(--ok);--ks:var(--ok-soft);--ki:var(--ok-ink)}
+.k-no{--kc:var(--warn);--ks:var(--warn-soft);--ki:var(--warn-ink)}
+.k-cond{--kc:var(--accent);--ks:var(--accent-soft);--ki:var(--accent-ink)}
+.k-must{--kc:var(--must);--ks:var(--must-soft);--ki:var(--must-ink)}
+.k-skip{--kc:var(--skip);--ks:var(--skip-soft);--ki:var(--skip-ink)}
+.darf-q{background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;outline:none}
+.darf-q .n{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.darf-q .q{font-size:20px;font-weight:600;line-height:1.3}
+.darf-q .help{font-size:15px;line-height:1.45;color:var(--muted)}
+.darf-q .yn{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
+.darf-q .yn button{height:52px;border:0;border-radius:12px;background:var(--btn);color:var(--btn-ink);font-size:17px;font-weight:700;cursor:pointer}
+.darf-v{background:var(--ks);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;outline:none}
+.darf-v .vh{display:flex;align-items:center;gap:12px}
+.darf-v .vh b{font-family:var(--f-display);font-weight:700;font-size:26px;line-height:1.05;color:var(--ki)}
+.darf-v>p{font-size:17px;line-height:1.5}
+.darf-v .notes{display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px solid var(--line);border-top-color:color-mix(in srgb,var(--kc) 35%,transparent)}
+.darf-v .notes .k{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ki)}
+.darf-v ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px;font-size:15px;line-height:1.45}
+.darf-v li::marker{color:var(--kc)}
+.darf-v .vf{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.darf-v .vf .ref{color:var(--ki);border-color:var(--ki);background:transparent}
+.darf-v .vf button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--ki);background:transparent;color:var(--ki);font-size:15px;font-weight:600;cursor:pointer}
+.darf-q:focus-visible,.darf-v:focus-visible{outline:2px solid var(--chrome-accent);outline-offset:2px}
+@media (max-width:359px){ .darf-tile{font-size:12px} .darf-strip li{font-size:11px} }
 
 .checklist{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 8px}
 .checklist .head{display:flex;justify-content:flex-end;padding:4px 6px 0}

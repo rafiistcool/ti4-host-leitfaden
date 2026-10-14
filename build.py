@@ -16,7 +16,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent
 SRC = ROOT / "src"
-DATA = ["data/ablauf.js", "data/themen.js", "data/regeln-1.js", "data/regeln-2.js",
+DATA = ["data/ablauf.js", "data/themen.js", "data/darfich.js", "data/regeln-1.js", "data/regeln-2.js",
         "data/tiles.js", "data/layouts.js", "data/fraktionen.js", "data/karten-1.js", "data/karten-2.js",
         "data/de-namen.js", "data/reference-assets.js", "data/original-assets.js", "data/english-sheets.js", "assets.js",
         "map.js", "aufbau.js", "kompendium.js", "hub.js"]

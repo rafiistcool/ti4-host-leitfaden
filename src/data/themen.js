@@ -1,12 +1,14 @@
 /* Themen fürs Nachschlagen. Blocktypen:
    {h}, {p}, {ul}, {steps}, {check, items:[{t,s}]}, {note, kind:"warn"|"tip"},
-   {table:{head,rows,num}}, {kv:[[wert,text]]}, {sc:[...]}, {qa:[{q,a}]}, {cards:[{title, blocks}]}, {rules:[ids]} */
+   {table:{head,rows,num}}, {kv:[[wert,text]]}, {sc:[...]}, {qa:[{q,a}]}, {cards:[{title, blocks}]}, {rules:[ids]},
+   {darf: Set-ID aus data/darfich.js} */
 window.TI4 = window.TI4 || {};
 TI4.topics = [
 { id: "kampf", name: "Kampf", icon: "kampf",
   desc: "Raumkampf, Rückzug, Einmarsch und Bodenkampf in der richtigen Reihenfolge.",
   blocks: [
     { h: "Raumkampf" },
+    { darf: "raumkampf" },
     { check: "raumkampf", items: [
       { t: "„Vor dem Kampf“ und „zu Beginn des Kampfes“", s: "Passende Aktionskarten, Agenten und Fähigkeiten. In Runde 1 ist „Beginn des Kampfes“ dasselbe Fenster wie „Beginn der Kampfrunde“." },
       { t: "1 · Jägerabwehr (nur Runde 1)", s: "Beide gleichzeitig, Treffer nur gegen Jäger. Hat danach eine Seite keine Schiffe mehr, endet der Kampf." },
@@ -18,6 +20,7 @@ TI4.topics = [
     ]},
     { note: "**Rückzug:** Alle Schiffe mit Bewegungswert ziehen in ein einziges angrenzendes System mit eigenen Einheiten oder eigenem Planeten und ohne fremde Schiffe. Dort einen Kommandomarker aus dem Nachschub ablegen, falls noch keiner liegt. Nicht in Nebel, Supernova oder Asteroidenfeld (ohne passende Technologie).", kind: "tip" },
     { h: "Einmarsch" },
+    { darf: "einmarsch" },
     { check: "einmarsch", items: [
       { t: "1 · Bombardement", s: "Für jede Einheit einen Planeten ansagen, dann würfeln. Der Besitzer zerstört eigene Bodentruppen. Planetarer Schild verhindert das, außer bei Kriegssonnen." },
       { t: "2 · Bodentruppen entsenden", s: "Beliebig viele aus dem Weltraum auf Planeten im System. Mecatol Rex mit Hütermarker: vorher 6 Einfluss zahlen, +1 Siegpunkt." },
@@ -97,6 +100,7 @@ TI4.topics = [
 { id: "timing", name: "Wann darf ich…?", icon: "timing",
   desc: "Aktionskarten, Sabotage, gleichzeitige Effekte, Passen und typische Streitfragen.",
   blocks: [
+    { darf: "aktion", level: 2 },
     { qa: [
       { q: "…eine Aktionskarte mit „Aktion“ spielen?", a: "Nur im eigenen Zug der Aktionsphase, als deine Aktion für diesen Zug (Materialaktion). Nicht nach dem Passen, nicht im Zug anderer, nicht in anderen Phasen. Nur wenn sie vollständig abgehandelt werden kann." },
       { q: "…eine Aktionskarte ohne „Aktion“ spielen?", a: "Genau dann, wenn der fett gedruckte Zeitpunkt eintritt, z. B. „zu Beginn einer Kampfrunde“. Das geht auch im Zug anderer, nach dem Passen und in jeder Phase. Es kostet keine Aktion." },
@@ -105,7 +109,7 @@ TI4.topics = [
       { q: "…etwas tun, wenn mehrere gleichzeitig wollen?", a: "Aktionsphase: der aktive Spieler zuerst, dann die anderen in Initiativreihenfolge, jeweils eine Fähigkeit, reihum bis niemand mehr will. Strategie- und Agendaphase: ab Sprecher im Uhrzeigersinn." },
       { q: "…„sobald“ und „nachdem“ unterscheiden?", a: "„Sobald“ greift gleichzeitig mit dem Ereignis und hat Vorrang, oft verändert es das Ereignis. „Bevor“ und „nachdem“ greifen unmittelbar davor bzw. danach, nicht irgendwann später im Zug." },
       { q: "…passen?", a: "Sobald du deine Strategieaktion gemacht hast. Bei 3 oder 4 Spielern müssen beide Strategiekarten erschöpft sein. Im Zug, in dem du passt, darfst du noch handeln." },
-      { q: "…eine Sekundärfähigkeit nutzen?", a: "Wenn ein anderer Spieler die Strategieaktion seiner Karte macht, reihum ab links von ihm. Kostet 1 Marker aus dem Strategiepool (Führungsstärke nicht). Geht auch, wenn du schon gepasst hast." },
+      { q: "…eine Sekundärfähigkeit nutzen?", a: "Wenn ein anderer Spieler die Strategieaktion seiner Karte macht, reihum ab links von ihm. Kostet 1 Marker aus dem Strategiepool. Ausnahmen: Führungsstärke kostet nie einen Marker, und bei Handel nutzen die vom aktiven Spieler gewählten Spieler sie gratis. Geht auch, wenn du schon gepasst hast." },
       { q: "…ein System mit fremdem Kommandomarker aktivieren?", a: "Ja. Nur Systeme mit deinem eigenen Marker kannst du nicht aktivieren." },
       { q: "…mich zurückziehen?", a: "Nur im Raumkampf: ankündigen in Schritt 2 (Verteidiger zuerst), ausführen in Schritt 5. Aus dem Bodenkampf nie." },
       { q: "…Aufträge werten?", a: "Statusphase Schritt 1: je 1 öffentlicher und 1 geheimer. Aktions- oder Agendaphase-Aufträge sofort, wenn erfüllt, aber pro Kampf höchstens 1. Imperium-Primär wertet einen öffentlichen Auftrag sofort. Öffentliche nur, wenn du alle Planeten deines Heimat-Systems kontrollierst." },
