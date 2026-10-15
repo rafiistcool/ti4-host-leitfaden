@@ -107,6 +107,13 @@
   var running = null;
   var zoom = 1;
   var selPos = null;
+  var sheetOpen = false;   // Handy: Einstellungen als Sheet von unten geöffnet
+  var genTab = "sys";      // Handy: sichtbarer Ergebnis-Reiter
+  var genHistory = [];     // vorige Karten für „Vorige Karte“
+  var refocus = null;      // Selektor, der nach dem Neuzeichnen wieder den Fokus bekommt
+  var sheetScroll = 0;
+  function mobile() { return window.matchMedia && window.matchMedia("(max-width: 1099px)").matches; }
+  function groupNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 
   function newSeed() { return 10000 + Math.floor(Math.random() * 89999990); }
   function defaultFlags(l) { return flagsOf({ pok: true, balance: true, wormholes: true, legendary: 0 }, l); }
@@ -119,29 +126,62 @@
   function genHash(o) { return "gen-" + o.layout + "-" + o.seed + "-" + flagsOf(o, byId[o.layout]); }
   function keyOf(o) { return genHash(o); }
 
+  /* Aufbau: Kopf, Ergebnis links, Einstellungen rechts (ab 1100 px). Auf dem Handy liegen die Einstellungen in einem Sheet,
+     Würfeln steht in der festen Leiste über der Tab-Leiste (dock). */
   function viewGenerator(route) {
     var ui = U(), esc = ui.esc;
     var o = route.opts, l = byId[o.layout];
     var pokForced = !!l.pok;
-    var h = '<a class="back" href="#aufbau-' + l.id + '">' + ui.svg("back", 18) + "Aufbau</a>" +
+    var sum = l.players + " Spieler · " + VARIANT_LABEL[l.id] + " · " + optSummary(o, pokForced);
+    return '<div class="gen' + (sheetOpen ? " sheet-open" : "") + '">' +
+      '<div class="gen-head"><a class="back" href="#aufbau-' + l.id + '">' + ui.svg("back", 18) + "Aufbau</a>" +
       "<h1>Kartengenerator</h1>" +
-      '<p class="lead">Würfelt eine Galaxie nach den offiziellen Aufbau-Regeln: keine Anomalien und keine gleichen Wurmlöcher nebeneinander, jeder Platz mit ähnlich viel in Reichweite.</p>' +
-      '<div class="card gen-set">' +
-      '<p class="section-k">Spielerzahl</p>' + countRow("gen-n", l.players) + variantRow("gen-l", l) +
-      '<details class="opts"' + (U0("ti4.v2.genopen", false) ? " open" : "") + '><summary><span>Optionen</span><span class="sum">' + esc(optSummary(o, pokForced)) + "</span></summary>" +
-      '<div class="toggles">' +
-      toggle("pok", "Tafeln aus Prophezeiung der Könige", pokForced ? "Für diesen Aufbau nötig" : "Aus: nur Tafeln des Grundspiels", o.pok || pokForced, pokForced) +
-      toggle("balance", "Ausgewogen", "Ressourcen, Einfluss und Spezialisierungen fair verteilen", o.balance, false) +
-      toggle("wormholes", "Wurmlöcher sicher dabei", "Mindestens 2 Alpha- und 2 Beta-Wurmlöcher", o.wormholes, false) +
+      '<p class="lead">Würfelt eine Galaxie nach den offiziellen Aufbau-Regeln: keine Anomalien und keine gleichen Wurmlöcher nebeneinander, jeder Platz mit ähnlich viel in Reichweite.</p></div>' +
+      '<div class="gen-main">' +
+      '<button type="button" class="gen-sum" data-act="gen-sheet" aria-controls="gen-panel" aria-expanded="' + (sheetOpen ? "true" : "false") + '"><span class="tx">' + esc(sum) + '</span><span class="chg">Ändern</span></button>' +
+      '<div class="gen-meta"><span class="seed">Karte Nr. ' + groupNum(o.seed) + '</span><span class="sum">' + esc(sum) + "</span></div>" +
+      '<div id="gen-out" class="gen-out">' + progressHTML(0) + "</div></div>" +
+      panelHTML(o, l, pokForced) +
+      '<div class="gen-scrim" data-act="gen-sheet-close"></div>' +
+      "</div>";
+  }
+  function genField(label, inner) { return '<div class="gen-field"><span class="k">' + U().esc(label) + "</span>" + inner + "</div>"; }
+  function panelHTML(o, l, pokForced) {
+    var ui = U();
+    var legRow = '<div class="seg-row" role="group" aria-label="Legendäre Planeten mindestens">' + [0, 1, 2].map(function (n) {
+      var dis = !(o.pok || pokForced) && n > 0;
+      return '<button type="button" data-act="gen-leg" data-n="' + n + '" aria-pressed="' + (o.legendary === n ? "true" : "false") + '"' + (dis ? " disabled" : "") + ">" + n + "</button>";
+    }).join("") + "</div>";
+    var vr = variantRow("gen-l", l);
+    return '<aside class="gen-panel" id="gen-panel" aria-labelledby="gen-panel-h"' + (sheetOpen ? ' role="dialog" aria-modal="true"' : "") + ">" +
+      '<div class="gen-panel-head"><span class="grip" aria-hidden="true"></span><h2 id="gen-panel-h" tabindex="-1">Galaxie einstellen</h2>' +
+      '<button type="button" class="gen-x" data-act="gen-sheet-close" aria-label="Einstellungen schließen">×</button></div>' +
+      '<div class="gen-panel-body" id="gen-panel-body">' +
+      genField("Spielerzahl", countRow("gen-n", l.players)) +
+      (vr ? genField("Aufbau", vr) : "") +
+      genField("Optionen", '<div class="toggles">' +
+        toggle("pok", "Tafeln aus Prophezeiung der Könige", pokForced ? "Für diesen Aufbau nötig" : "Aus: nur Tafeln des Grundspiels", o.pok || pokForced, pokForced) +
+        toggle("balance", "Ausgewogen", "Ressourcen, Einfluss und Spezialisierungen fair verteilen", o.balance, false) +
+        toggle("wormholes", "Wurmlöcher sicher dabei", "Mindestens 2 Alpha- und 2 Beta-Wurmlöcher", o.wormholes, false) + "</div>") +
+      genField("Legendäre Planeten mindestens", legRow) +
+      '<form class="gen-field gen-seed" data-form="gen-seed"><label class="k" for="gen-seed-in">Karte per Nummer laden</label>' +
+      '<div class="row"><input id="gen-seed-in" type="text" inputmode="numeric" autocomplete="off" value="' + o.seed + '"><button type="submit" class="btn">Laden</button></div></form>' +
+      '<div class="gen-field gen-share-mini"><span class="k">Teilen</span><div class="two">' +
+      '<button type="button" class="btn" data-act="gen-link">' + ui.svg("copy", 18) + "Link kopieren</button>" +
+      '<button type="button" class="btn" data-act="gen-code">' + ui.svg("copy", 18) + "Kartencode</button></div></div>" +
       "</div>" +
-      '<p class="section-k">Legendäre Planeten mindestens</p><div class="seg-row" role="group" aria-label="Legendäre Planeten">' + [0, 1, 2].map(function (n) {
-        var dis = !(o.pok || pokForced) && n > 0;
-        return '<button type="button" data-act="gen-leg" data-n="' + n + '" aria-pressed="' + (o.legendary === n ? "true" : "false") + '"' + (dis ? " disabled" : "") + ">" + n + "</button>";
-      }).join("") + "</div></details>" +
-      '<button type="button" class="btn primary" data-act="gen-roll">' + ui.svg("dice", 22) + '<span class="txt">Neue Galaxie würfeln</span><span class="arr">›</span></button>' +
-      "</div>" +
-      '<div id="gen-out" class="gen-out">' + progressHTML(0) + "</div>";
-    return h;
+      '<div class="gen-panel-foot"><button type="button" class="btn primary" data-act="gen-roll">' + ui.svg("dice", 22) + '<span class="txt">Neue Galaxie würfeln</span><span class="arr">›</span></button>' +
+      '<button type="button" class="gen-undo" data-act="gen-undo"' + (genHistory.length ? "" : " disabled") + ">‹ Vorige Karte</button></div>" +
+      "</aside>";
+  }
+  function dockHTML() {
+    var ui = U();
+    return '<div class="gen-bar">' +
+      '<button type="button" class="btn sq" data-act="gen-sheet" aria-controls="gen-panel" aria-expanded="' + (sheetOpen ? "true" : "false") + '" aria-label="Galaxie einstellen">' +
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M16 5v4M10 15v4"/></svg></button>' +
+      '<button type="button" class="btn primary" data-act="gen-roll">' + ui.svg("dice", 22) + '<span class="txt">Neu würfeln</span><span class="arr">›</span></button>' +
+      '<button type="button" class="btn sq" data-act="gen-undo" aria-label="Vorige Karte"' + (genHistory.length ? "" : " disabled") + ">" +
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4"/></svg></button></div>';
   }
   function optSummary(o, pokForced) {
     var p = [(o.pok || pokForced) ? "mit PoK-Tafeln" : "nur Grundspiel"];
@@ -190,30 +230,50 @@
     var ui = U(), esc = ui.esc;
     var l = res.layout, list = M.tileList(res);
     selPos = null;
-    var h = '<div class="board-tools"><span class="seed">Karte Nr. ' + res.seed + "</span><span class=\"spacer\"></span>" +
-      '<button type="button" class="tool" data-act="zoom" data-z="-1" aria-label="Verkleinern">−</button>' +
-      '<button type="button" class="tool" data-act="zoom" data-z="0" aria-label="Ganze Karte">' + Math.round(zoom * 100) + " %</button>" +
-      '<button type="button" class="tool" data-act="zoom" data-z="1" aria-label="Vergrößern">+</button></div>' +
-      '<div class="board tiles"><div class="board-scroll' + (zoom > 1 ? " zoomed" : "") + '" id="board-scroll"><div class="board-inner" style="width:' + (zoom * 100) + '%">' +
-      M.boardSVG(l, res.board, "tiles", { uid: "g", label: "Erzeugte Galaxie " + l.name }) + "</div></div></div>" +
-      '<div class="hexinfo" id="hexinfo"><p class="hint">Tippe auf ein System für Details. Mit + vergrößern, die Karte lässt sich dann verschieben.</p></div>';
-
-    // Ausgleich
     var ev = res.eval, seats = ev.seats;
-    h += "<h2>Ausgleich je Platz</h2>" +
+    var TABS = [["sys", "System"], ["bal", "Ausgleich"], ["pull", "Tafeln"], ["share", "Teilen"]];
+    var h = '<div class="gen-res" data-tab="' + genTab + '">' +
+      '<div class="board tiles" id="gen-board"><div class="board-scroll' + (zoom > 1 ? " zoomed" : "") + '" id="board-scroll"><div class="board-inner" style="width:' + (zoom * 100) + '%">' +
+      M.boardSVG(l, res.board, "tiles", { uid: "g", label: "Erzeugte Galaxie " + l.name }) + "</div></div>" +
+      '<button type="button" class="map-btn map-full" data-act="gen-full" aria-pressed="false" aria-label="Karte im Vollbild zeigen">' +
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>' +
+      '<div class="map-zoom" role="group" aria-label="Zoom">' +
+      '<button type="button" class="map-btn" data-act="zoom" data-z="1" aria-label="Vergrößern">+</button>' +
+      '<button type="button" class="map-btn lab" data-act="zoom" data-z="0" aria-label="Ganze Karte zeigen">' + Math.round(zoom * 100) + " %</button>" +
+      '<button type="button" class="map-btn" data-act="zoom" data-z="-1" aria-label="Verkleinern">−</button></div>' +
+      '<span class="map-seed">Nr. ' + groupNum(res.seed) + "</span></div>" +
+      '<div class="gen-tabs" role="tablist" aria-label="Ergebnis">' + TABS.map(function (t) {
+        var on = genTab === t[0];
+        return '<button type="button" role="tab" id="gen-tab-' + t[0] + '" aria-controls="gen-sec-' + t[0] + '" aria-selected="' + on + '" data-act="gen-tab" data-t="' + t[0] + '">' + t[1] + "</button>";
+      }).join("") + "</div>";
+
+    // System
+    h += '<section class="gen-sec" data-sec="sys" id="gen-sec-sys" role="tabpanel" aria-labelledby="gen-tab-sys"><h2 class="gen-k">Gewähltes System</h2>' +
+      '<div class="hexinfo" id="hexinfo"><p class="hint">Tippe auf ein System für Details. Mit + vergrößern, die Karte lässt sich dann verschieben.</p></div></section>';
+
+    // Ausgleich: Balken je Platz, Einzelwerte aufklappbar
+    var max = Math.max.apply(null, seats.map(function (S) { return S.score; })) || 1;
+    h += '<section class="gen-sec" data-sec="bal" id="gen-sec-bal" role="tabpanel" aria-labelledby="gen-tab-bal"><h2 class="gen-k">Ausgleich je Platz <span>Spanne ' + dec(ev.spread) + "</span></h2>" +
+      '<div class="bars">' + seats.map(function (S, k) {
+        var tg = l.tg && l.tg[String(S.home)];
+        return '<div class="bar-row"><b><span class="seat" style="background:' + M.SEAT[k % 8] + '"></span>P' + (k + 1) + "</b>" +
+          '<span class="track" aria-hidden="true"><i style="width:' + Math.round(S.score / max * 100) + "%;background:" + M.SEAT[k % 8] + '"></i></span>' +
+          '<span class="v">' + dec(S.score) + "</span>" + (k === 0 || tg ? '<small>' + (k === 0 ? "Sprecher" : "") + (k === 0 && tg ? " · " : "") + (tg ? "+" + tg + " HW" : "") + "</small>" : "") + "</div>";
+      }).join("") + "</div>" +
+      (res.violations ? '<p class="fine"><b>Achtung:</b> ' + res.violations + " Nachbarschaft(en) von Anomalien oder gleichen Wurmlöchern ließen sich nicht vermeiden.</p>" : "") +
+      '<details class="q"><summary>Einzelwerte und Berechnung</summary><div class="a">' +
       '<div class="tbl"><table class="balance"><thead><tr><th>Platz</th><th>Res.</th><th>Einfl.</th><th>Spez.</th><th class="opt">Leg.</th><th class="opt">Wurml.</th><th>Wert</th></tr></thead><tbody>' +
       seats.map(function (S, k) {
-        var tg = l.tg && l.tg[String(S.home)];
-        return '<tr><td><span class="seat" style="background:' + M.SEAT[k % 8] + '"></span>P' + (k + 1) + (k === 0 ? " <small>Sprecher</small>" : "") + (tg ? " <small>+" + tg + " HW</small>" : "") + "</td>" +
+        return '<tr><td><span class="seat" style="background:' + M.SEAT[k % 8] + '"></span>P' + (k + 1) + "</td>" +
           [S.R, S.I, S.skip, S.leg, S.wh].map(function (v, j) { return '<td class="num' + (j > 2 ? " opt" : "") + '">' + dec(v) + "</td>"; }).join("") +
           '<td class="num"><b>' + dec(S.score) + "</b></td></tr>";
       }).join("") + "</tbody></table></div>" +
-      '<p class="fine">Gezählt wird, was jeder Platz in Reichweite hat: Systeme direkt nebenan voll, 2 Felder entfernt zu 60 %, 3 Felder entfernt zu 30 %. Liegt ein System gleich weit von mehreren Plätzen, teilen sie es sich. Wurmlöcher und Hyperrouten zählen als Verbindung. Je Planet zählt der höhere Wert von Ressourcen und Einfluss. Unterschied zwischen bestem und schwächstem Platz: <b>' + dec(ev.spread) + "</b>" +
-      (res.violations ? ". Achtung: " + res.violations + " Nachbarschaft(en) von Anomalien oder gleichen Wurmlöchern ließen sich nicht vermeiden." : ".") + "</p>";
+      '<p class="fine">Gezählt wird, was jeder Platz in Reichweite hat: Systeme direkt nebenan voll, 2 Felder entfernt zu 60 %, 3 Felder entfernt zu 30 %. Liegt ein System gleich weit von mehreren Plätzen, teilen sie es sich. Wurmlöcher und Hyperrouten zählen als Verbindung. Je Planet zählt der höhere Wert von Ressourcen und Einfluss. Die Spanne ist der Unterschied zwischen bestem und schwächstem Platz.</p>' +
+      "</div></details></section>";
 
     // Tafeln aus der Schachtel
     var frontier = l.slots.filter(function (p) { var t = D.tiles[res.board[p]]; return t && !(t.p && t.p.length); }).length;
-    h += "<h2>Aus der Schachtel holen</h2>" +
+    h += '<section class="gen-sec" data-sec="pull" id="gen-sec-pull" role="tabpanel" aria-labelledby="gen-tab-pull"><h2 class="gen-k">Aus der Schachtel holen</h2>' +
       '<div class="pull">' +
       pullRow("Mitte", ["18"], "") +
       pullRow("Blau", list.blue, "blue") +
@@ -222,15 +282,39 @@
       "</div>" +
       '<ul class="plain"><li>Dazu je Spieler das Heimat-System seiner Fraktion auf den grünen Platz.</li>' +
       "<li><b>" + frontier + " Wilder-Raum-Marker</b> für die Systeme ohne Planeten.</li>" +
-      "<li>Den <b>Wurmloch-Nexus</b> (Tafel 82) mit der Gamma-Seite neben den Spielplan.</li></ul>";
+      "<li>Den <b>Wurmloch-Nexus</b> (Tafel 82) mit der Gamma-Seite neben den Spielplan.</li></ul></section>";
 
-    // Teilen
+    // Teilen (am PC zusätzlich als Knöpfe in den Einstellungen)
     var code = M.mapString(res);
-    h += "<h2>Teilen</h2>" +
+    h += '<section class="gen-sec" data-sec="share" id="gen-sec-share" role="tabpanel" aria-labelledby="gen-tab-share"><h2 class="gen-k">Teilen</h2>' +
       '<div class="share"><button type="button" class="btn" data-act="gen-link">' + ui.svg("copy", 20) + "Link zu dieser Karte kopieren</button>" +
       '<p class="fine">Der Link öffnet genau diese Karte wieder. Darunter steht der Kartencode: die Tafelnummern ab Position 1, Ring für Ring im Uhrzeigersinn ab oben, 0 für Heimat-Systeme, Hyperrouten mit Drehung.</p>' +
-      '<div class="codebox"><code id="mapcode">' + esc(code) + '</code><button type="button" class="tool" data-act="gen-code" aria-label="Kartencode kopieren">' + ui.svg("copy", 18) + "</button></div></div>";
-    out.innerHTML = h;
+      '<div class="codebox"><code id="mapcode">' + esc(code) + '</code><button type="button" class="tool" data-act="gen-code" aria-label="Kartencode kopieren">' + ui.svg("copy", 18) + "</button></div></div></section>";
+    out.innerHTML = h + "</div>";
+  }
+  function setTab(t) {
+    genTab = t;
+    var r = document.querySelector(".gen-res"); if (r) r.setAttribute("data-tab", t);
+    document.querySelectorAll(".gen-tabs [role=tab]").forEach(function (b) { b.setAttribute("aria-selected", b.getAttribute("data-t") === t ? "true" : "false"); });
+  }
+  function setSheet(open, focusBack) {
+    sheetOpen = !!open && mobile();
+    var g = document.querySelector(".gen"), p = document.getElementById("gen-panel");
+    if (g) g.classList.toggle("sheet-open", sheetOpen);
+    if (p) {
+      if (sheetOpen) { p.setAttribute("role", "dialog"); p.setAttribute("aria-modal", "true"); }
+      else { p.removeAttribute("role"); p.removeAttribute("aria-modal"); }
+    }
+    document.querySelectorAll('[data-act="gen-sheet"]').forEach(function (b) { b.setAttribute("aria-expanded", sheetOpen ? "true" : "false"); });
+    if (sheetOpen) { var hd = document.getElementById("gen-panel-h"); if (hd) hd.focus(); }
+    else if (focusBack) { var opener = document.querySelector('.ext-dock [data-act="gen-sheet"]') || document.querySelector(".gen-sum"); if (opener) opener.focus(); }
+  }
+  function setFull(on) {
+    var b = document.getElementById("gen-board"); if (!b) return;
+    b.classList.toggle("full", on);
+    document.documentElement.classList.toggle("gen-fullscreen", on);
+    var btn = b.querySelector(".map-full");
+    if (btn) { btn.setAttribute("aria-pressed", on ? "true" : "false"); btn.setAttribute("aria-label", on ? "Vollbild beenden" : "Karte im Vollbild zeigen"); }
   }
   function pullRow(label, ids, cls) {
     return '<div class="pull-row"><span class="k">' + U().esc(label) + (ids.length > 1 ? " · " + ids.length : "") + '</span><span class="ids">' +
@@ -288,7 +372,20 @@
     genPrefs = { layout: o.layout, pok: o.pok, balance: o.balance, wormholes: o.wormholes, legendary: o.legendary };
     try { localStorage.setItem("ti4.v2.gen", JSON.stringify(genPrefs)); } catch (e) {}
   }
-  function goGen(o) { setPrefs(o); U().go(genHash(o)); }
+  /* Neu zeichnen über den Link: im Sheet bleiben Scrollposition und Fokus auf dem bedienten Element erhalten. */
+  function goGen(o, focusSel) {
+    var body = document.getElementById("gen-panel-body");
+    sheetScroll = body ? body.scrollTop : 0;
+    refocus = focusSel || null;
+    setPrefs(o); U().go(genHash(o));
+  }
+  function rememberAndRoll(o) {
+    var cur = U().route().opts;
+    if (cur) { genHistory.push(Object.assign({}, cur)); if (genHistory.length > 20) genHistory.shift(); }
+    o.seed = newSeed();
+    sheetOpen = false;
+    goGen(o);
+  }
 
   /* ---------- Registrierung ---------- */
   D.ext.push({
@@ -315,8 +412,18 @@
       return viewGenerator(route);
     },
     after: function (route) {
-      if (route.page === "gen") startGen(route); else running = null;
+      if (route.page !== "gen") { running = null; sheetOpen = false; document.documentElement.classList.remove("gen-fullscreen"); return; }
+      if (sheetOpen && !mobile()) sheetOpen = false;
+      startGen(route);
+      if (sheetOpen) {
+        var body = document.getElementById("gen-panel-body"); if (body) body.scrollTop = sheetScroll;
+      }
+      if (refocus) {
+        var f = document.querySelector(refocus); refocus = null;
+        if (f) { try { f.focus({ preventScroll: true }); } catch (e) { f.focus(); } }
+      }
     },
+    dock: function (route) { return route.page === "gen" ? dockHTML() : ""; },
     click: function (a, t, ev) {
       var route = U().route();
       if (a === "setup-n" || a === "setup-l") {
@@ -326,10 +433,19 @@
       }
       if (route.page !== "gen") return false;
       var o = Object.assign({}, route.opts);
-      if (a === "gen-n") { var vs = variants(+t.getAttribute("data-n")); o.layout = vs[0].id; goGen(o); return true; }
-      if (a === "gen-l") { o.layout = t.getAttribute("data-l"); goGen(o); return true; }
-      if (a === "gen-leg") { o.legendary = +t.getAttribute("data-n"); goGen(o); return true; }
-      if (a === "gen-roll") { o.seed = newSeed(); goGen(o); return true; }
+      if (a === "gen-n") { var vs = variants(+t.getAttribute("data-n")); o.layout = vs[0].id; goGen(o, '[data-act="gen-n"][data-n="' + t.getAttribute("data-n") + '"]'); return true; }
+      if (a === "gen-l") { o.layout = t.getAttribute("data-l"); goGen(o, '[data-act="gen-l"][data-l="' + o.layout + '"]'); return true; }
+      if (a === "gen-leg") { o.legendary = +t.getAttribute("data-n"); goGen(o, '[data-act="gen-leg"][data-n="' + o.legendary + '"]'); return true; }
+      if (a === "gen-roll") { rememberAndRoll(o); return true; }
+      if (a === "gen-undo") {
+        var prev = genHistory.pop();
+        if (prev) { sheetOpen = false; goGen(prev); }
+        return true;
+      }
+      if (a === "gen-sheet") { setSheet(!sheetOpen, true); return true; }
+      if (a === "gen-sheet-close") { setSheet(false, true); return true; }
+      if (a === "gen-tab") { setTab(t.getAttribute("data-t")); return true; }
+      if (a === "gen-full") { var bd = document.getElementById("gen-board"); setFull(!(bd && bd.classList.contains("full"))); return true; }
       if (a === "zoom") {
         var z = +t.getAttribute("data-z"), steps = [1, 1.5, 2, 3];
         var i = steps.indexOf(zoom); if (i < 0) i = 0;
@@ -341,7 +457,7 @@
           sc.classList.toggle("zoomed", zoom > 1);
           sc.scrollLeft = cx * sc.scrollWidth - sc.clientWidth / 2; sc.scrollTop = cy * sc.scrollHeight - sc.clientHeight / 2;
         }
-        var lab = document.querySelector('.board-tools [data-z="0"]'); if (lab) lab.textContent = Math.round(zoom * 100) + " %";
+        var lab = document.querySelector('.map-zoom [data-z="0"]'); if (lab) lab.textContent = Math.round(zoom * 100) + " %";
         return true;
       }
       if (a === "hex") { showHex(+t.getAttribute("data-pos")); return true; }
@@ -353,7 +469,8 @@
         res.layout.hyper.forEach(function (x) { if (x[1] === id) pos = x[0]; });
         if (pos > -1) {
           showHex(pos);
-          var b = document.querySelector(".board-tools");
+          setTab("sys");
+          var b = document.getElementById("gen-board");
           if (b) window.scrollTo(0, Math.max(0, b.getBoundingClientRect().top + window.scrollY - document.getElementById("top").offsetHeight - 8));
         }
         return true;
@@ -367,13 +484,12 @@
     },
     change: function (ev) {
       var k = ev.target.getAttribute && ev.target.getAttribute("data-gen");
-      try { localStorage.setItem("ti4.v2.genopen", "true"); } catch (e) {}
       if (!k) return false;
       var route = U().route(); if (route.page !== "gen") return true;
       var o = Object.assign({}, route.opts);
       o[k] = ev.target.checked;
       if (k === "pok" && !o.pok) o.legendary = 0;
-      goGen(o);
+      goGen(o, "#gt-" + k);
       return true;
     },
     index: function (push) {
@@ -383,6 +499,38 @@
         push({ ty: "Aufbau", t: l.name, txt: "Spielplan für " + l.players + " Spieler. Jeder bekommt " + dealText(l) + " Systemtafeln." + (l.extra ? " Der Sprecher legt zusätzlich " + extraText(l) + " an Mecatol Rex." : "") + (l.hyper.length ? " Hyperrouten " + l.hyper.map(function (x) { return x[1]; }).join(" ") : ""), href: "#aufbau-" + l.id, w: 2 });
       });
     }
+  });
+
+  /* Escape schließt Sheet oder Vollbild, Tab bleibt im offenen Sheet. */
+  document.addEventListener("keydown", function (ev) {
+    if (U().route().page !== "gen") return;
+    var board = document.getElementById("gen-board");
+    if (ev.key === "Escape") {
+      if (board && board.classList.contains("full")) { setFull(false); var fb = board.querySelector(".map-full"); if (fb) fb.focus(); ev.preventDefault(); return; }
+      if (sheetOpen) { setSheet(false, true); ev.preventDefault(); return; }
+    }
+    if (ev.key === "Tab" && sheetOpen) {
+      var p = document.getElementById("gen-panel"); if (!p) return;
+      var els = [].slice.call(p.querySelectorAll("button:not([disabled]), input:not([disabled]), [tabindex='-1']")).filter(function (e) { return e.offsetParent !== null; });
+      if (!els.length) return;
+      var first = els[0], last = els[els.length - 1];
+      if (!p.contains(document.activeElement)) { first.focus(); ev.preventDefault(); }
+      else if (ev.shiftKey && document.activeElement === first) { last.focus(); ev.preventDefault(); }
+      else if (!ev.shiftKey && document.activeElement === last) { first.focus(); ev.preventDefault(); }
+    }
+  });
+  /* „Karte per Nummer laden“ */
+  document.addEventListener("submit", function (ev) {
+    if (!ev.target.getAttribute || ev.target.getAttribute("data-form") !== "gen-seed") return;
+    ev.preventDefault();
+    var route = U().route(); if (route.page !== "gen") return;
+    var inp = document.getElementById("gen-seed-in");
+    var n = parseInt(String(inp ? inp.value : "").replace(/\D/g, ""), 10);
+    if (!(n > 0 && n <= 4294967295)) { if (inp) { inp.setAttribute("aria-invalid", "true"); inp.focus(); } return; }
+    var o = Object.assign({}, route.opts);
+    if (o.seed !== n) { genHistory.push(Object.assign({}, route.opts)); if (genHistory.length > 20) genHistory.shift(); }
+    o.seed = n; sheetOpen = false;
+    goGen(o);
   });
 
   D.Setup = { tileInfo: tileInfo };

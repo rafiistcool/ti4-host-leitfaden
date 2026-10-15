@@ -616,6 +616,9 @@
 
   function renderDock() {
     var bar = document.getElementById("actionbar");
+    var extDock = route.v === "ext" && route.x.dock ? route.x.dock(route) : "";
+    if (extDock) { bar.hidden = false; bar.className = "actionbar ext-dock"; bar.innerHTML = extDock; return; }
+    bar.className = "actionbar";
     if (route.v !== "ablauf") { bar.hidden = true; bar.innerHTML = ""; return; }
     bar.hidden = false;
     var ph = PH[st.p];
@@ -649,6 +652,7 @@
 
   function render(scroll) {
     document.body.classList.toggle("is-wide", route.v === "ext" && !!route.wide);
+    document.body.setAttribute("data-page", route.v === "ext" ? (route.page || route.rail || "ext") : route.v);
     renderRail(); renderTop(); renderView(); renderDock(); renderTabbar();
     var topH = document.getElementById("top").offsetHeight;
     document.documentElement.style.setProperty("--top-h", topH + "px");
