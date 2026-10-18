@@ -1,5 +1,5 @@
 # TI4 Host-Leitfaden
-test
+
 Host-Begleiter für **Twilight Imperium: Vierte Edition** mit **Prophezeiung der Könige**, gebaut fürs Handy am Spieltisch und als Web-App installierbar.
 
 - **Ablauf**: führt Schritt für Schritt durch Strategie-, Aktions-, Status- und Agendaphase, mit Ansagen für den Tisch, Warnhinweisen und passenden Regelverweisen. Runde und Hütermarker werden mitgezählt, die Agendaphase schaltet sich erst nach dem Hütermarker frei.
