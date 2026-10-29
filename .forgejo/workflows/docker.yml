@@ -12,7 +12,8 @@ on:
 
 jobs:
   image:
-    runs-on: ubuntu-latest
+    # Nur der Runner mit dem Label docker-host gibt Jobs den Docker-Socket.
+    runs-on: docker-host
     strategy:
       # Ein fehlgeschlagenes API-Image soll das Seiten-Image nicht abbrechen
       fail-fast: false
